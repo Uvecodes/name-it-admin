@@ -1,0 +1,364 @@
+<!-- NOTE THAT FOR THE ORDER HANDLING A FUNCTIONALITY AND FEATURE WILL
+  BE BUILT SO THAT THE ADMIN CAN UPDATE IF AN ORDER HAS BEEN 
+  SHIPPED OR NOT OR DELIVERED. IN THAT FUNCTIONALITY 
+  THE ADMIN SHOULD ALSO HAVE A SPACE TO INPUT A COMMENT 
+  INCASE THE ADMIN DECIDES TO CANCEL THE ORDER HIMSELF OR HERSELF -->
+
+  <!-- ALSO ADD AN AI FEATURE TO THIS ADMIN DEPARTMENT THAT CAN HANDLE PRODUCT CREATION SO THAT THE ADMIN CAN PROMPT THE AI ABOUT THE PRODUCT AND THE AI CREATES THE PRODUCT -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name It Admin - Orders</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="brand">Name It Admin</h1>
+        </div>
+        
+        <ul class="nav-menu">
+            <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
+            <li><a href="add-products.html" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
+            <li><a href="manage-products.html" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
+            <li><a href="orders.html" class="nav-link active"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <li class="nav-divider"></li>
+            <li><a href="index.html" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
+        </ul>
+    </nav>
+
+    <!-- Mobile Menu Toggle (Placeholder) -->
+    <button class="mobile-menu-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Header Bar -->
+        <header class="header">
+            <div class="header-content">
+                <h2>Order Management</h2>
+                <div class="header-actions">
+                    <span class="admin-name">Admin User</span>
+                    <div class="admin-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Orders Container -->
+        <div class="orders-container">
+            <!-- Orders Stats -->
+            <div class="orders-stats">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Total Orders</h3>
+                        <p class="stat-number">1,247</p>
+                        <span class="stat-change positive">+12.5%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Pending</h3>
+                        <p class="stat-number">23</p>
+                        <span class="stat-change negative">-5.2%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Completed</h3>
+                        <p class="stat-number">1,189</p>
+                        <span class="stat-change positive">+8.7%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Revenue</h3>
+                        <p class="stat-number">$45.2k</p>
+                        <span class="stat-change positive">+15.3%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="search-input" placeholder="Search orders by ID, customer, or product...">
+                </div>
+                
+                <div class="filter-options">
+                    <select class="filter-select">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    
+                    <select class="filter-select">
+                        <option value="">All Categories</option>
+                        <option value="perfume">Perfume</option>
+                        <option value="clothes">Clothes</option>
+                    </select>
+                    
+                    <input type="date" class="filter-date" value="2024-01-01">
+                    
+                    <button class="btn btn-primary">
+                        <i class="fas fa-filter"></i>
+                        Filter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Orders Table -->
+            <div class="table-container">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Products</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="order-id">#ORD-001</td>
+                            <td class="customer-info">
+                                <div class="customer-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="customer-name">Sarah Johnson</div>
+                                    <div class="customer-email">sarah.j@email.com</div>
+                                </div>
+                            </td>
+                            <td class="order-products">
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Luxury Perfume - Rose</span>
+                                    <span class="quantity">x2</span>
+                                </div>
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Designer Shirt</span>
+                                    <span class="quantity">x1</span>
+                                </div>
+                            </td>
+                            <td class="order-total">$299.99</td>
+                            <td>
+                                <span class="status-badge pending">Pending</span>
+                            </td>
+                            <td class="order-date">Jan 15, 2024</td>
+                            <td class="order-actions">
+                                <button class="btn-icon view-btn" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon edit-btn" title="Edit Order">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon delete-btn" title="Delete Order">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td class="order-id">#ORD-002</td>
+                            <td class="customer-info">
+                                <div class="customer-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="customer-name">Michael Chen</div>
+                                    <div class="customer-email">m.chen@email.com</div>
+                                </div>
+                            </td>
+                            <td class="order-products">
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Premium Cologne</span>
+                                    <span class="quantity">x1</span>
+                                </div>
+                            </td>
+                            <td class="order-total">$89.99</td>
+                            <td>
+                                <span class="status-badge processing">Processing</span>
+                            </td>
+                            <td class="order-date">Jan 14, 2024</td>
+                            <td class="order-actions">
+                                <button class="btn-icon view-btn" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon edit-btn" title="Edit Order">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon delete-btn" title="Delete Order">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td class="order-id">#ORD-003</td>
+                            <td class="customer-info">
+                                <div class="customer-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="customer-name">Emily Davis</div>
+                                    <div class="customer-email">emily.d@email.com</div>
+                                </div>
+                            </td>
+                            <td class="order-products">
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Designer Dress</span>
+                                    <span class="quantity">x1</span>
+                                </div>
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Floral Perfume</span>
+                                    <span class="quantity">x1</span>
+                                </div>
+                            </td>
+                            <td class="order-total">$189.99</td>
+                            <td>
+                                <span class="status-badge shipped">Shipped</span>
+                            </td>
+                            <td class="order-date">Jan 13, 2024</td>
+                            <td class="order-actions">
+                                <button class="btn-icon view-btn" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon edit-btn" title="Edit Order">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon delete-btn" title="Delete Order">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td class="order-id">#ORD-004</td>
+                            <td class="customer-info">
+                                <div class="customer-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="customer-name">David Wilson</div>
+                                    <div class="customer-email">d.wilson@email.com</div>
+                                </div>
+                            </td>
+                            <td class="order-products">
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Business Suit</span>
+                                    <span class="quantity">x1</span>
+                                </div>
+                            </td>
+                            <td class="order-total">$399.99</td>
+                            <td>
+                                <span class="status-badge delivered">Delivered</span>
+                            </td>
+                            <td class="order-date">Jan 12, 2024</td>
+                            <td class="order-actions">
+                                <button class="btn-icon view-btn" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon edit-btn" title="Edit Order">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon delete-btn" title="Delete Order">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td class="order-id">#ORD-005</td>
+                            <td class="customer-info">
+                                <div class="customer-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="customer-name">Lisa Brown</div>
+                                    <div class="customer-email">lisa.b@email.com</div>
+                                </div>
+                            </td>
+                            <td class="order-products">
+                                <div class="product-item">
+                                    <img src="https://via.placeholder.com/40x40" alt="Product">
+                                    <span>Evening Gown</span>
+                                    <span class="quantity">x1</span>
+                                </div>
+                            </td>
+                            <td class="order-total">$599.99</td>
+                            <td>
+                                <span class="status-badge cancelled">Cancelled</span>
+                            </td>
+                            <td class="order-date">Jan 11, 2024</td>
+                            <td class="order-actions">
+                                <button class="btn-icon view-btn" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon edit-btn" title="Edit Order">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon delete-btn" title="Delete Order">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button class="pagination-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="pagination-btn active">1</button>
+                <button class="pagination-btn">2</button>
+                <button class="pagination-btn">3</button>
+                <span class="pagination-dots">...</span>
+                <button class="pagination-btn">12</button>
+                <button class="pagination-btn">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+    
+    <script src="./js/firebaseconfig.js"></script>
+    <script src="./js/auth.js"></script>
+</body>
+</html> 
