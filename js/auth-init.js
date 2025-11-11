@@ -1,53 +1,6 @@
 // Firebase Authentication System
 // This file handles all authentication functionality for the admin dashboard
-
-// Firebase Configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBNlcypjh6hCAbn7WCVVYPhtHNjBOVm2Cg",
-  authDomain: "name-it-e674c.firebaseapp.com",
-  projectId: "name-it-e674c",
-  storageBucket: "name-it-e674c.firebasestorage.app",
-  messagingSenderId: "299394886026",
-  appId: "1:299394886026:web:ca4e737e214c858ee08073",
-  measurementId: "G-6DSQ7Y1F5E"
-};
-
-// Initialize Firebase (only if not already initialized)
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-// Toast Notification System
-function showToast(message, type = "success") {
-  // Create toast element if it doesn't exist
-  let toast = document.getElementById("toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "toast";
-    toast.className = "toast";
-    document.body.appendChild(toast);
-  }
-
-  // Clear any existing timeout
-  if (toast.timeoutId) {
-    clearTimeout(toast.timeoutId);
-  }
-
-  // Set message and type
-  toast.textContent = message;
-  toast.className = `toast show ${type}`;
-
-  // Hide toast after 3 seconds
-  toast.timeoutId = setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => {
-      toast.classList.add("hidden");
-    }, 300);
-  }, 3000);
-}
+// Firebase config, services, and toast are loaded from firebase-config.js
 
 // Register Function
 async function register(event) {
@@ -58,13 +11,16 @@ async function register(event) {
     showToast("Sorry, you are currently offline", "error");
     return;
   }
-
+  const name = document.getElementById("name").value.trim();
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
   const confirmPassword = document.getElementById("confirm-password").value;
 
   // Validation
-  if (!email || !password || !confirmPassword) {
+  
+  
+
+  if (!name || !email || !password || !confirmPassword) {
     showToast("Please fill all fields.", "error");
     return;
   }
@@ -175,43 +131,33 @@ async function forgotPassword() {
 }
 
 // Auth State Monitor
-// firebase.auth().onAuthStateChanged((user) => {
-//   if (user) {
+firebase.auth().onAuthStateChanged((user) => {
+  if (user) {
     // User is signed in
-    // console.log("User is signed in:", user.email);
+    console.log("User is signed in:", user.email);
     
     // If on login/signup page, redirect to admin profile
-  //   if (window.location.pathname.includes("login.html") || 
-  //       window.location.pathname.includes("signup.html")) {
-  //     window.location.href = "admin-profile.html";
-  //   }
-  // } else {
+    if (window.location.pathname.includes("login.html") || 
+        window.location.pathname.includes("signup.html")) {
+      window.location.href = "admin-profile.html";
+    }
+  } else {
     // User is signed out
-    // console.log("User is signed out");
+    console.log("User is signed out");
     
     // If on protected pages, redirect to login
-//     if (window.location.pathname.includes("add-products.html") ||
-//         window.location.pathname.includes("manage-products.html") ||
-//         window.location.pathname.includes("admin-order.html") ||
-//         window.location.pathname.includes("admin-profile.html")) {
-//       window.location.href = "index.html";
-//     }
-//   }
-// });
-
-
-
-// Auth State Monitor
-firebase.auth().onAuthStateChanged((user) => {
-  const status = document.getElementById("userInfo");
-  if (user) {
-    if (status) status.innerText = `Logged in as: ${user.email}`;
-  } else {
-    if (window.location.pathname.includes("dashboard")) {
-      window.location.href = "../index.html";
+    if (window.location.pathname.includes("add-products.html") ||
+        window.location.pathname.includes("manage-products.html") ||
+        window.location.pathname.includes("admin-order.html") ||
+        window.location.pathname.includes("admin-profile.html")) {
+      window.location.href = "login.html";
     }
   }
 });
+
+
+
+
 
 
 // Event Listeners

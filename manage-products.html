@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+
+    <!-- fire base v8 -->
+
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 </head>
 <body>
     <!-- Sidebar Navigation -->
@@ -16,10 +24,11 @@
         </div>
         
         <ul class="nav-menu">
-            <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-            <li><a href="add-products.html" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
-            <li><a href="manage-products.html" class="nav-link active"><i class="fas fa-box"></i>Manage Products</a></li>
-            <li><a href="admin-order.html" class="nav-link"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <!-- <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li> -->
+            <li><a href="./add-products.html" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
+            <li><a href="./manage-products.html" class="nav-link active"><i class="fas fa-box"></i>Manage Products</a></li>
+            <li><a href="./admin-order.html" class="nav-link"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <li><a href="./admin-profile.html" class="nav-link active"><i class="fas fa-user"></i>Profile</a></li>
             <li class="nav-divider"></li>
             <li><a href="index.html" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
         </ul>
@@ -73,6 +82,8 @@
             </div>
 
             <!-- Products Table -->
+
+            <!-- nb this section will be overwritten by js -->
             <div class="table-container">
                 <table class="products-table">
                     <thead>
@@ -81,22 +92,25 @@
                             <th>Name</th>
                             <th>Category</th>
                             <th>Price</th>
+                            <th>Stock</th>
                             <th>Status</th>
+                            <th>Popular</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
                             <td class="product-image">
-                                <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=80&q=80" alt="Classic Black UDT">
+                                <!-- <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=80&q=80" alt="Classic Black UDT"> -->
+                                 <img src="https://placehold.co/400" alt="">
                             </td>
-                            <td class="product-name">Classic Black UDT for Men 100ml</td>
+                            <td class="product-name">...</td>
                             <td class="product-category">
-                                <span class="category-badge perfume">Perfume</span>
+                                <span class="category-badge perfume">...</span>
                             </td>
-                            <td class="product-price">$45.00</td>
+                            <td class="product-price">...</td>
                             <td class="product-status">
-                                <span class="status-badge active">Active</span>
+                                <span class="status-badge active">...</span>
                             </td>
                             <td class="product-actions">
                                 <button class="btn-icon edit-btn" title="Edit">
@@ -109,15 +123,16 @@
                         </tr>
                         <tr>
                             <td class="product-image">
-                                <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=80&q=80" alt="Club De Nuit">
+                                <!-- <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=80&q=80" alt="Club De Nuit"> -->
+                                 <img src="https://placehold.co/400" alt="">
                             </td>
-                            <td class="product-name">Club De Nuit Intense UDT 105ml</td>
+                            <td class="product-name">...</td>
                             <td class="product-category">
-                                <span class="category-badge perfume">Perfume</span>
+                                <span class="category-badge perfume">...</span>
                             </td>
-                            <td class="product-price">$45.00</td>
+                            <td class="product-price">...</td>
                             <td class="product-status">
-                                <span class="status-badge active">Active</span>
+                                <span class="status-badge active">...</span>
                             </td>
                             <td class="product-actions">
                                 <button class="btn-icon edit-btn" title="Edit">
@@ -130,15 +145,16 @@
                         </tr>
                         <tr>
                             <td class="product-image">
-                                <img src="https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=80&q=80" alt="Amber Dulcux">
+                                <!-- <img src="https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=80&q=80" alt="Amber Dulcux"> -->
+                                  <img src="https://placehold.co/400" alt="">
                             </td>
-                            <td class="product-name">AMBER DULCUX LUXP 100 ml</td>
+                            <td class="product-name">...</td>
                             <td class="product-category">
-                                <span class="category-badge perfume">Perfume</span>
+                                <span class="category-badge perfume">...</span>
                             </td>
-                            <td class="product-price">$45.00</td>
+                            <td class="product-price">...</td>
                             <td class="product-status">
-                                <span class="status-badge inactive">Inactive</span>
+                                <span class="status-badge inactive">...</span>
                             </td>
                             <td class="product-actions">
                                 <button class="btn-icon edit-btn" title="Edit">
@@ -151,15 +167,16 @@
                         </tr>
                         <tr>
                             <td class="product-image">
-                                <img src="https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=80&q=80" alt="Revolutionary Noir">
+                                <!-- <img src="https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=80&q=80" alt="Revolutionary Noir"> -->
+                                  <img src="https://placehold.co/400" alt="">
                             </td>
-                            <td class="product-name">Revolution Revolutionary Noir UDT</td>
+                            <td class="product-name">...</td>
                             <td class="product-category">
-                                <span class="category-badge perfume">Perfume</span>
+                                <span class="category-badge perfume">...</span>
                             </td>
-                            <td class="product-price">$45.00</td>
+                            <td class="product-price">...</td>
                             <td class="product-status">
-                                <span class="status-badge active">Active</span>
+                                <span class="status-badge active">...</span>
                             </td>
                             <td class="product-actions">
                                 <button class="btn-icon edit-btn" title="Edit">
@@ -172,15 +189,16 @@
                         </tr>
                         <tr>
                             <td class="product-image">
-                                <img src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=80&q=80" alt="Genial Attitude">
+                                <!-- <img src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=80&q=80" alt="Genial Attitude"> -->
+                                  <img src="https://placehold.co/400" alt="">
                             </td>
-                            <td class="product-name">GENIAL ATTITUDE EDP 100 ml</td>
+                            <td class="product-name">...</td>
                             <td class="product-category">
-                                <span class="category-badge perfume">Perfume</span>
+                                <span class="category-badge perfume">...</span>
                             </td>
-                            <td class="product-price">$45.00</td>
+                            <td class="product-price">...</td>
                             <td class="product-status">
-                                <span class="status-badge active">Active</span>
+                                <span class="status-badge active">...</span>
                             </td>
                             <td class="product-actions">
                                 <button class="btn-icon edit-btn" title="Edit">
@@ -211,5 +229,10 @@
             </div>
         </div>
     </main>
+
+    <script src="./js/firebase-config.js"></script>
+    <!-- <script src="./js/auth.js"></script>
+    <script src="./js/add-product2.js"></script> -->
+    <script src="./js/manage-product.js"></script>
 </body>
 </html> 

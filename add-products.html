@@ -7,6 +7,19 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+
+
+<!-- fire base v8 -->
+
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+
+
+
 </head>
 <body>
     <!-- Sidebar Navigation -->
@@ -16,12 +29,13 @@
         </div>
         
         <ul class="nav-menu">
-            <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-            <li><a href="add-products.html" class="nav-link active"><i class="fas fa-plus"></i>Add Product</a></li>
-            <li><a href="manage-products.html" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
-            <li><a href="admin-order.html" class="nav-link"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <!-- <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li> -->
+            <li><a href="./add-products.html" class="nav-link active"><i class="fas fa-plus"></i>Add Product</a></li>
+            <li><a href="./manage-products.html" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
+            <li><a href="./admin-order.html" class="nav-link"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <li><a href="./admin-profile.html" class="nav-link active"><i class="fas fa-user"></i>Profile</a></li>
             <li class="nav-divider"></li>
-            <li><a href="index.html" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
+            <li><a href="#" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
         </ul>
     </nav>
 
@@ -60,8 +74,13 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="product-price">Price ($)</label>
-                        <input type="number" id="product-price" name="product-price" step="0.01" min="0" placeholder="0.00" required>
+                        <label for="product-price">Price (NGN)</label>
+                        <input type="number" id="product-price" name="product-price" step="0.1" min="1" placeholder="0.00" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="product-count">Product Count</label>
+                        <input type="number" id="product-count" name="product-count" step="1" min="1" placeholder="0.00" required>
                     </div>
 
                     <div class="form-group">
@@ -83,6 +102,12 @@
                             <span>Choose a file or drag it here</span>
                         </div>
                     </div>
+                    <div id="image-preview-container" class="image-preview-container" style="display: none;">
+                        <img id="image-preview" src="" alt="Image preview" class="image-preview">
+                        <button type="button" id="remove-preview" class="remove-preview-btn" title="Remove image">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="form-actions">
@@ -92,5 +117,9 @@
             </form>
         </div>
     </main>
+
+    <script src="./js/firebase-config.js"></script>
+    <!-- <script src="./js/auth.js"></script> -->
+    <script src="./js/add-product.js"></script>
 </body>
 </html> 
