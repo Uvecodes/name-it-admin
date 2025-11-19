@@ -10,12 +10,14 @@
 
 
 
-<!-- fire base v8 -->
-
-     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <!-- API Client - Must be loaded first -->
+    <script src="./js/api-client.js"></script>
+    
+    <!-- Firebase client SDK removed - now using backend API -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script> -->
 
 
 
@@ -118,8 +120,12 @@
         </div>
     </main>
 
-    <script src="./js/firebase-config.js"></script>
-    <!-- <script src="./js/auth.js"></script> -->
+    <!-- Firebase config removed - now using backend API -->
+    <!-- <script src="./js/firebase-config.js"></script> -->
+    <script src="./js/auth.js"></script>
     <script src="./js/add-product.js"></script>
+    
+    <!-- Toast container for user notifications -->
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
 </body>
 </html> 

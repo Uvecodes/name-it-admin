@@ -17,12 +17,14 @@
 
 
 
-     <!-- fire base v8 -->
-
-     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <!-- API Client - Must be loaded first -->
+    <script src="./js/api-client.js"></script>
+    
+    <!-- Firebase client SDK removed - now using backend API -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script> -->
 
 
 
@@ -161,195 +163,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td class="order-id">#ORD-001</td>
-                            <td class="customer-info">
-                                <div class="customer-avatar">
-                                    <i class="fas fa-user"></i>
-                                </div>
-                                <div>
-                                    <div class="customer-name">Sarah Johnson</div>
-                                    <div class="customer-email">sarah.j@email.com</div>
-                                </div>
-                            </td>
-                            <td class="order-products">
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Luxury Perfume - Rose</span>
-                                    <span class="quantity">x2</span>
-                                </div>
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Designer Shirt</span>
-                                    <span class="quantity">x1</span>
-                                </div>
-                            </td>
-                            <td class="order-total">$299.99</td>
-                            <td>
-                                <span class="status-badge pending">Pending</span>
-                            </td>
-                            <td class="order-date">Jan 15, 2024</td>
-                            <td class="order-actions">
-                                <button class="btn-icon view-btn" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon edit-btn" title="Edit Order">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-btn" title="Delete Order">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td class="order-id">#ORD-002</td>
-                            <td class="customer-info">
-                                <div class="customer-avatar">
-                                    <i class="fas fa-user"></i>
-                                </div>
-                                <div>
-                                    <div class="customer-name">Michael Chen</div>
-                                    <div class="customer-email">m.chen@email.com</div>
-                                </div>
-                            </td>
-                            <td class="order-products">
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Premium Cologne</span>
-                                    <span class="quantity">x1</span>
-                                </div>
-                            </td>
-                            <td class="order-total">$89.99</td>
-                            <td>
-                                <span class="status-badge processing">Processing</span>
-                            </td>
-                            <td class="order-date">Jan 14, 2024</td>
-                            <td class="order-actions">
-                                <button class="btn-icon view-btn" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon edit-btn" title="Edit Order">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-btn" title="Delete Order">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td class="order-id">#ORD-003</td>
-                            <td class="customer-info">
-                                <div class="customer-avatar">
-                                    <i class="fas fa-user"></i>
-                                </div>
-                                <div>
-                                    <div class="customer-name">Emily Davis</div>
-                                    <div class="customer-email">emily.d@email.com</div>
-                                </div>
-                            </td>
-                            <td class="order-products">
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Designer Dress</span>
-                                    <span class="quantity">x1</span>
-                                </div>
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Floral Perfume</span>
-                                    <span class="quantity">x1</span>
-                                </div>
-                            </td>
-                            <td class="order-total">$189.99</td>
-                            <td>
-                                <span class="status-badge shipped">Shipped</span>
-                            </td>
-                            <td class="order-date">Jan 13, 2024</td>
-                            <td class="order-actions">
-                                <button class="btn-icon view-btn" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon edit-btn" title="Edit Order">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-btn" title="Delete Order">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td class="order-id">#ORD-004</td>
-                            <td class="customer-info">
-                                <div class="customer-avatar">
-                                    <i class="fas fa-user"></i>
-                                </div>
-                                <div>
-                                    <div class="customer-name">David Wilson</div>
-                                    <div class="customer-email">d.wilson@email.com</div>
-                                </div>
-                            </td>
-                            <td class="order-products">
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Business Suit</span>
-                                    <span class="quantity">x1</span>
-                                </div>
-                            </td>
-                            <td class="order-total">$399.99</td>
-                            <td>
-                                <span class="status-badge delivered">Delivered</span>
-                            </td>
-                            <td class="order-date">Jan 12, 2024</td>
-                            <td class="order-actions">
-                                <button class="btn-icon view-btn" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon edit-btn" title="Edit Order">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-btn" title="Delete Order">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td class="order-id">#ORD-005</td>
-                            <td class="customer-info">
-                                <div class="customer-avatar">
-                                    <i class="fas fa-user"></i>
-                                </div>
-                                <div>
-                                    <div class="customer-name">Lisa Brown</div>
-                                    <div class="customer-email">lisa.b@email.com</div>
-                                </div>
-                            </td>
-                            <td class="order-products">
-                                <div class="product-item">
-                                    <img src="https://via.placeholder.com/40x40" alt="Product">
-                                    <span>Evening Gown</span>
-                                    <span class="quantity">x1</span>
-                                </div>
-                            </td>
-                            <td class="order-total">$599.99</td>
-                            <td>
-                                <span class="status-badge cancelled">Cancelled</span>
-                            </td>
-                            <td class="order-date">Jan 11, 2024</td>
-                            <td class="order-actions">
-                                <button class="btn-icon view-btn" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon edit-btn" title="Edit Order">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-btn" title="Delete Order">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
+                        <!-- Orders will be dynamically loaded here -->
                     </tbody>
                 </table>
             </div>
@@ -371,7 +185,12 @@
         </div>
     </main>
     
-    <script src="./js/firebase-config.js"></script>
+    <!-- Firebase config removed - now using backend API -->
+    <!-- <script src="./js/firebase-config.js"></script> -->
     <script src="./js/auth.js"></script>
+    <script src="./js/admin-order.js"></script>
+    
+    <!-- Toast container for user notifications -->
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
 </body>
 </html> 

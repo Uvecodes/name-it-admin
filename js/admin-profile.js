@@ -5,23 +5,11 @@ console.log = function() {};
 console.warn = function() {};
 console.error = function() {};
 console.info = function() {};
-  const adminProfileAuth =
-    (typeof window !== "undefined" && window.auth) ||
-    (typeof firebase !== "undefined" && typeof firebase.auth === "function"
-      ? firebase.auth()
-      : null);
-  const adminProfileDb =
-    (typeof window !== "undefined" && window.db) ||
-    (typeof firebase !== "undefined" && typeof firebase.firestore === "function"
-      ? firebase.firestore()
-      : null);
-  const adminProfileStorage =
-    (typeof window !== "undefined" && window.storage) ||
-    (typeof firebase !== "undefined" && typeof firebase.storage === "function"
-      ? firebase.storage()
-      : null);
+  
+  // API Client - uses window.api from api-client.js
 
-  const AVATAR_PLACEHOLDER = "https://via.placeholder.com/120x120";
+  // Use a data URI for placeholder to avoid network requests
+  const AVATAR_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect fill='%23ddd' width='120' height='120'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='50' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3E%3C/text%3E%3C/svg%3E";
   const UPLOAD_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
   const state = {
@@ -112,15 +100,54 @@ console.info = function() {};
     }
   }
 
-  async function fetchAdminProfile(user) {
-    if (!adminProfileDb || !user) {
+  function updateOrdersCount(count) {
+    const ordersStatItem = Array.from(
+      document.querySelectorAll(".profile-stats .stat-item")
+    ).find((item) => {
+      const label = item.querySelector(".stat-label");
+      return label && label.textContent.trim().toLowerCase() === "orders";
+    });
+
+    const statNumberEl = ordersStatItem?.querySelector(".stat-number");
+    if (statNumberEl) {
+      statNumberEl.textContent = typeof count === "number" ? count : "0";
+    }
+  }
+
+  function updateRevenue(revenue) {
+    const revenueStatItem = Array.from(
+      document.querySelectorAll(".profile-stats .stat-item")
+    ).find((item) => {
+      const label = item.querySelector(".stat-label");
+      return label && label.textContent.trim().toLowerCase() === "revenue";
+    });
+
+    const statNumberEl = revenueStatItem?.querySelector(".stat-number");
+    if (statNumberEl) {
+      if (typeof revenue === "number") {
+        // Format revenue: if >= 1000, show as $X.Xk, otherwise show full amount
+        if (revenue >= 1000) {
+          statNumberEl.textContent = `$${(revenue / 1000).toFixed(1)}k`;
+        } else {
+          statNumberEl.textContent = `$${revenue.toFixed(2)}`;
+        }
+      } else {
+        statNumberEl.textContent = "$0";
+      }
+    }
+  }
+
+  async function fetchAdminProfile() {
+    if (typeof window === 'undefined' || !window.api) {
       return null;
     }
 
     try {
-      const docRef = adminProfileDb.collection("admin").doc(user.uid);
-      const snapshot = await docRef.get();
-      return snapshot.exists ? snapshot.data() : null;
+      const response = await window.api.get('/admin/profile');
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return null;
     } catch (error) {
       console.error("Error fetching admin profile:", error);
       notify("Unable to load admin profile.", "error");
@@ -128,37 +155,46 @@ console.info = function() {};
     }
   }
 
-  async function fetchProductCount(userId) {
-    if (!adminProfileDb) {
-      return 0;
+  async function fetchStats() {
+    if (typeof window === 'undefined' || !window.api) {
+      return { productCount: 0, ordersCount: 0, revenue: 0 };
     }
 
     try {
-      const productsCollection = adminProfileDb.collection("products");
-
-      let snapshot = null;
-      if (userId) {
-        snapshot = await productsCollection.where("createdBy", "==", userId).get();
-        if (!snapshot.empty) {
-          return snapshot.size;
-        }
+      const response = await window.api.get('/admin/stats');
+      if (response.success && response.data) {
+        return {
+          productCount: response.data.productCount || 0,
+          ordersCount: response.data.ordersCount || 0,
+          revenue: response.data.revenue || 0,
+        };
       }
-
-      snapshot = await productsCollection.get();
-      return snapshot.size;
+      return { productCount: 0, ordersCount: 0, revenue: 0 };
     } catch (error) {
-      console.error("Error fetching product count:", error);
-      notify("Unable to load product statistics.", "error");
-      return 0;
+      console.error("Error fetching statistics:", error);
+      notify("Unable to load statistics.", "error");
+      return { productCount: 0, ordersCount: 0, revenue: 0 };
     }
   }
 
-  async function populateProfile(user) {
-    updateProfileName(user.displayName || user.email || "Admin User");
+  async function populateProfile() {
+    // Get current user from API client
+    const user = window.api?.auth?.getCurrentUserSync();
+    if (!user) {
+      redirectToLogin();
+      return;
+    }
+
+    updateProfileName(user.name || user.email || "Admin User");
     updateProfileEmail(user.email || "");
     updateAvatarPreview(AVATAR_PLACEHOLDER);
 
-    const profileData = await fetchAdminProfile(user);
+    // Fetch profile and stats in parallel for better performance
+    const [profileData, stats] = await Promise.all([
+      fetchAdminProfile(),
+      fetchStats()
+    ]);
+
     if (profileData) {
       if (profileData.name) {
         updateProfileName(profileData.name);
@@ -171,11 +207,12 @@ console.info = function() {};
       }
     }
 
-    const productCount = await fetchProductCount(user.uid);
-    updateProductCount(productCount);
+    updateProductCount(stats.productCount);
+    updateOrdersCount(stats.ordersCount);
+    updateRevenue(stats.revenue);
   }
 
-  function attachAvatarUploadListener(userId) {
+  function attachAvatarUploadListener() {
     if (state.avatarListenerAttached) {
       return;
     }
@@ -207,7 +244,7 @@ console.info = function() {};
         return;
       }
 
-      if (!adminProfileStorage || !adminProfileDb) {
+      if (typeof window === 'undefined' || !window.api) {
         notify("Avatar upload is not available right now.", "error");
         avatarInput.value = "";
         return;
@@ -220,26 +257,26 @@ console.info = function() {};
         state.uploadingAvatar = true;
         notify("Uploading avatar...", "info");
 
-        const storageRef = adminProfileStorage.ref();
-        const avatarRef = storageRef.child(
-          `admin-avatars/${userId}/${Date.now()}_${file.name}`
-        );
-        const snapshot = await avatarRef.put(file);
-        const downloadUrl = await snapshot.ref.getDownloadURL();
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('avatar', file);
 
-        await adminProfileDb.collection("admin").doc(userId).set(
-          {
-            avatarUrl: downloadUrl,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
+        // Upload via API
+        const response = await window.api.upload('/admin/avatar', formData);
 
-        updateAvatarPreview(downloadUrl);
-        notify("Avatar updated successfully.", "success");
+        if (response.success && response.data.avatarUrl) {
+          updateAvatarPreview(response.data.avatarUrl);
+          notify("Avatar updated successfully.", "success");
+        } else {
+          throw new Error(response.message || 'Upload failed');
+        }
       } catch (error) {
         console.error("Error uploading avatar:", error);
-        notify("Failed to upload avatar. Please try again.", "error");
+        let errorMessage = "Failed to upload avatar. Please try again.";
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        notify(errorMessage, "error");
         updateAvatarPreview(AVATAR_PLACEHOLDER);
       } finally {
         state.uploadingAvatar = false;
@@ -255,40 +292,123 @@ console.info = function() {};
     window.location.href = "./login.html";
   }
 
-  function handleAuthChange(user) {
-    if (!user) {
+  async function handleAuthChange() {
+    if (typeof window === 'undefined' || !window.api) {
       redirectToLogin();
       return;
+    }
+
+    const isAuthenticated = window.api.auth.isAuthenticated();
+    
+    if (!isAuthenticated) {
+      redirectToLogin();
+      return;
+    }
+
+    // Try to get user from sync first (from localStorage)
+    let user = window.api.auth.getCurrentUserSync();
+    
+    // If no user in sync, try to fetch from API
+    if (!user) {
+      try {
+        user = await window.api.auth.getCurrentUser();
+        if (!user) {
+          redirectToLogin();
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+        // Don't redirect immediately - token might still be valid
+        // Just use what we have
+        user = window.api.auth.getCurrentUserSync();
+        if (!user) {
+          redirectToLogin();
+          return;
+        }
+      }
     }
 
     const hasNewUser = state.currentUserId !== user.uid;
     state.currentUserId = user.uid;
 
     if (hasNewUser) {
-      populateProfile(user);
-      attachAvatarUploadListener(user.uid);
+      populateProfile();
+      attachAvatarUploadListener();
     }
   }
 
   function subscribeToAuthChanges() {
-    if (!adminProfileAuth || typeof adminProfileAuth.onAuthStateChanged !== "function") {
-      console.error("Firebase auth is not available for admin profile.");
-      notify("Authentication is not available. Please refresh the page.", "error");
+    // Check initial auth state (async)
+    handleAuthChange().catch(error => {
+      console.error('Error in handleAuthChange:', error);
+    });
+
+    // Listen for auth events from API client
+    window.addEventListener('auth:login', () => {
+      handleAuthChange().catch(error => {
+        console.error('Error in handleAuthChange after login:', error);
+      });
+    });
+
+    window.addEventListener('auth:logout', () => {
+      redirectToLogin();
+    });
+  }
+
+  // Mobile menu toggle
+  function setupMobileMenuToggle() {
+    const mobileToggle = document.querySelector('.mobile-menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+
+    if (!mobileToggle || !sidebar) {
+      console.warn('Mobile menu toggle or sidebar not found');
       return;
     }
 
-    adminProfileAuth.onAuthStateChanged(handleAuthChange);
+    // Remove any existing event listeners by cloning the element
+    const newToggle = mobileToggle.cloneNode(true);
+    mobileToggle.parentNode.replaceChild(newToggle, mobileToggle);
 
-    const currentUser = adminProfileAuth.currentUser;
-    if (currentUser) {
-      handleAuthChange(currentUser);
-    }
+    // Add click event listener
+    newToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sidebar.classList.toggle('mobile-open');
+      console.log('Mobile menu toggled, sidebar has mobile-open:', sidebar.classList.contains('mobile-open'));
+    });
+
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', (e) => {
+      if (window.innerWidth <= 768) {
+        if (sidebar.classList.contains('mobile-open') && 
+            !sidebar.contains(e.target) && 
+            !newToggle.contains(e.target)) {
+          sidebar.classList.remove('mobile-open');
+        }
+      }
+    });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    setupMobileMenuToggle();
+    
     if (!navigator.onLine) {
       notify("You are currently offline. Data may be outdated.", "error");
     }
-    subscribeToAuthChanges();
+    
+    // Wait for API client to be ready
+    if (typeof window !== 'undefined' && window.api) {
+      subscribeToAuthChanges();
+    } else {
+      // Retry after a short delay if API client not ready
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.api) {
+          subscribeToAuthChanges();
+        } else {
+          notify("API client not available. Please refresh the page.", "error");
+        }
+      }, 500);
+    }
   });
 })();
+

@@ -1,15 +1,11 @@
-// Firebase config, services, and toast are loaded from firebase-config.js
-
+// API Client - uses window.api from api-client.js
+// Firebase client SDK has been migrated to backend API
 
 // console.log() redec;laration to avoid errors in some environments
 console.log = function() {};
 console.warn = function() {};
 console.error = function() {};
 console.info = function() {};
-// Get Firebase services (use window if available, otherwise fallback to global firebase)
-const auth = (typeof window !== 'undefined' && window.auth) ? window.auth : (typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null);
-const db = (typeof window !== 'undefined' && window.db) ? window.db : (typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null);
-const storage = (typeof window !== 'undefined' && window.storage) ? window.storage : (typeof firebase !== 'undefined' && firebase.storage ? firebase.storage() : null);
 
 // Toast Notification System (if not already defined)
 function showToast(message, type = "success") {
@@ -59,14 +55,17 @@ async function handleAddProduct(event) {
   }
 
   // Check if user is authenticated
-  const currentUser = auth.currentUser;
-  if (!currentUser) {
+  if (typeof window === 'undefined' || !window.api) {
+    showToast("API client not available. Please refresh the page.", "error");
+    return;
+  }
+
+  if (!window.api.auth.isAuthenticated()) {
     console.error("No authenticated user found");
     showToast("You must be logged in to add products", "error");
     window.location.href = "login.html";
     return;
   }
-  console.log("Authenticated user:", currentUser.email);
 
   // Get form values
   const name = document.getElementById("product-name").value.trim();
@@ -93,59 +92,49 @@ async function handleAddProduct(event) {
   }
 
   try {
-    // Check if Firebase services are available
-    if (!auth || !db || !storage) {
-      console.error('Firebase services not available', { auth, db, storage });
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
-      return;
+    // Create FormData for product and image
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('description', description);
+    formData.append('price', price);
+    formData.append('count', count);
+    formData.append('category', category);
+    formData.append('status', 'active');
+    formData.append('image', imageFile);
+
+    // Create product via API
+    const response = await window.api.upload('/products', formData);
+
+    if (response.success) {
+      showToast("Product added successfully!", "success");
+      
+      // Reset form after successful upload
+      document.querySelector(".product-form").reset();
+      
+      // Clear image preview
+      const previewContainer = document.getElementById("image-preview-container");
+      const previewImage = document.getElementById("image-preview");
+      if (previewContainer) previewContainer.style.display = "none";
+      if (previewImage) previewImage.src = "";
+    } else {
+      showToast(response.message || "Failed to add product", "error");
     }
-
-    // Upload image to Firebase Storage
-    const storageRef = storage.ref();
-    const imageRef = storageRef.child(`products/${Date.now()}_${imageFile.name}`);
-    const snapshot = await imageRef.put(imageFile);
-    const imageUrl = await snapshot.ref.getDownloadURL();
-
-    // Save product to Firestore
-    console.log("Saving to Firestore...", { name, description, price, count, category, imageUrl });
-    const docRef = await db.collection("products").add({
-      name: name,
-      description: description,
-      price: price,
-      count: count,
-      category: category,
-      imageUrl: imageUrl,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      status: "active"
-    });
-    console.log("Document written with ID: ", docRef.id);
-
-    showToast("Product added successfully!", "success");
-    
-    // Reset form after successful upload
-    document.querySelector(".product-form").reset();
-    
-    // Clear image preview
-    const previewContainer = document.getElementById("image-preview-container");
-    const previewImage = document.getElementById("image-preview");
-    if (previewContainer) previewContainer.style.display = "none";
-    if (previewImage) previewImage.src = "";
   } catch (error) {
     console.error("Error adding product:", error);
     
     // Provide user-friendly error messages
-    let errorMessage = error.message;
+    let errorMessage = error.message || "Failed to add product. Please try again.";
     
-    if (error.code === 'storage/unauthorized' || error.code === 'storage/permission-denied') {
-      errorMessage = 'Permission denied. Please check Firebase Storage security rules. You need to allow authenticated users to upload files.';
-    } else if (error.code === 'storage/canceled') {
-      errorMessage = 'Upload was canceled. Please try again.';
-    } else if (error.code === 'storage/unknown') {
-      errorMessage = 'An unknown error occurred during upload. Please try again.';
-    } else if (error.code === 'permission-denied') {
-      errorMessage = 'Permission denied. Please check Firestore security rules.';
-    } else if (error.code === 'unavailable') {
-      errorMessage = 'Service unavailable. Please check your internet connection and try again.';
+    if (errorMessage.includes('Only image files')) {
+      errorMessage = 'Please select a valid image file.';
+    } else if (errorMessage.includes('File size')) {
+      errorMessage = 'Image size must be less than 5MB.';
+    } else if (errorMessage.includes('Network')) {
+      errorMessage = 'Network error. Please check your internet connection.';
+    } else if (errorMessage.includes('Permission denied') || errorMessage.includes('unauthorized')) {
+      errorMessage = 'Permission denied. Please check your authentication.';
+    } else if (errorMessage.includes('Missing required fields')) {
+      errorMessage = 'Please fill all required fields.';
     }
     
     showToast(errorMessage, "error");
@@ -219,11 +208,31 @@ function setupMobileMenuToggle() {
   const sidebar = document.querySelector(".sidebar");
 
   if (!mobileToggle || !sidebar) {
+    console.warn('Mobile menu toggle or sidebar not found');
     return;
   }
 
-  mobileToggle.addEventListener("click", () => {
-    sidebar.classList.toggle("mobile-open");
+  // Remove any existing event listeners by cloning the element
+  const newToggle = mobileToggle.cloneNode(true);
+  mobileToggle.parentNode.replaceChild(newToggle, mobileToggle);
+
+  // Add click event listener
+  newToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sidebar.classList.toggle('mobile-open');
+    console.log('Mobile menu toggled, sidebar has mobile-open:', sidebar.classList.contains('mobile-open'));
+  });
+
+  // Close sidebar when clicking outside on mobile
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768) {
+      if (sidebar.classList.contains('mobile-open') && 
+          !sidebar.contains(e.target) && 
+          !newToggle.contains(e.target)) {
+        sidebar.classList.remove('mobile-open');
+      }
+    }
   });
 }
 

@@ -4,7 +4,7 @@
 // Provides user feedback through toast notifications
 // Handles all authentication scenarios (signup, login, logout, password reset)
 // Protects routes by monitoring authentication state
-// Uses Firebase v8 for compatibility and simplicity
+// Uses backend API for authentication (migrated from Firebase client SDK)
 // Follows best practices for error handling and user experience
 // The file is designed to be smart - it automatically detects which page it's on and sets up the appropriate functionality without conflicts.
 
@@ -46,20 +46,10 @@ function showToast(message, type = "success") {
 // Shows the toast for 3 seconds, then hides it with a smooth animation
 // Uses CSS classes to control visibility and styling
 
-// Firebase Configuration
-// NOTE: The canonical `firebaseConfig` and app initialization live in `firebase-config.js`.
-// This file will use the already-initialized services if available. Fallbacks use the
-// global `firebase` object if present.
-const auth = (typeof window !== 'undefined' && window.auth) ? window.auth : (typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null);
-const db = (typeof window !== 'undefined' && window.db) ? window.db : (typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null);
-
-// comment for the above code
-// Purpose: Sets up Firebase connection and services
-// Logic:
-// Contains your Firebase project credentials
-// Checks if Firebase is already initialized (prevents duplicate initialization errors)
-// Creates auth object for user authentication (login, signup, logout)
-// Creates db object for Firestore database operations
+// API Client
+// NOTE: The API client is initialized in `api-client.js` and exposed as `window.api`
+// This file uses the API client for all authentication operations
+// The API client handles token management and request formatting
 
 //below are the functions for authentication
 // Import offline detection (you'll need to add this)
@@ -70,7 +60,7 @@ async function register(event) {
   // Check if user is offline
   event.preventDefault(); // Prevent form submission from refreshing the page
 if (!navigator.onLine) {
-  showToast("Sorry, you are currently offline", "error");
+  showToast("Sorry, you are currently offline");
   return;
 }
   
@@ -81,9 +71,9 @@ if (!navigator.onLine) {
   const confirmInput = document.getElementById("confirm-password");
 
   // Defensive checks: ensure required form fields exist before reading values
-  if (!emailInput || !passwordInput || !confirmInput) {
-    console.error('Register: form inputs missing', { nameInput, emailInput, passwordInput, confirmInput });
-    showToast('Form is incomplete or missing required fields.', 'error');
+  if (!nameInput || !emailInput || !passwordInput || !confirmInput) {
+    console.error('Register: form inputs missing');
+    showToast('Form is incomplete or missing required fields.');
     return;
   }
 
@@ -94,12 +84,12 @@ if (!navigator.onLine) {
 
   // Validation
   if (!name || !email || !password || !confirmPassword) {
-    showToast("Please fill all fields.", "error");
+    showToast("Please fill all fields.");
     return;
   }
 
   if (password !== confirmPassword) {
-    showToast("Passwords do not match.", "error");
+    showToast("Passwords do not match.");
     return;
   }
 
@@ -108,45 +98,42 @@ if (!navigator.onLine) {
   
 
   try {
-    if (!auth || !db) {
-      console.error('Firebase services not available', { auth, db });
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
+    // Check if API client is available
+    if (typeof window === 'undefined' || !window.api) {
+      showToast('API client not available. Please refresh the page.', 'error');
       return;
     }
-    // Set persistence to SESSION (default) or LOCAL based on your needs
-    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
-    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-    const user = userCredential.user;
 
-    // Wait for the auth token to be available before writing to Firestore
-    const idToken = await user.getIdToken();
-    if (!idToken) {
-      throw new Error('Authentication token not available. Please try again.');
+    // Register user via API
+    const response = await window.api.auth.register({
+      name,
+      email,
+      password,
+      confirmPassword,
+    });
+
+    if (response.success) {
+      showToast("Registered and logged in!", "success");
+      // Redirect to profile/dashboard after signup
+      window.location.href = "./admin-profile.html";
+    } else {
+      showToast(response.message || "Registration failed", "error");
     }
-
-    // Save extra data to Firestore
-    await db
-      .collection("admin")
-      .doc(user.uid)
-      .set({
-        name,
-        email,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-
-    showToast("Registered and logged in!", "success");
-    window.location.href = "./admin-profile.html";
   } catch (error) {
     console.error("Signup error:", error);
-    // Provide more specific error messages
-    let errorMessage = error.message;
-    if (error.code === 'permission-denied') {
-      errorMessage = 'Permission denied. Please check Firestore security rules.';
-    } else if (error.code === 'unavailable') {
-      errorMessage = 'Firestore is unavailable. Please check your internet connection.';
-    } else if (error.code === 'invalid-argument') {
-      errorMessage = 'Invalid data format. Please try again.';
+    // Provide user-friendly error messages
+    let errorMessage = error.message || "Registration failed. Please try again.";
+    
+    if (errorMessage.includes('Email already')) {
+      errorMessage = 'Email already registered. Please use a different email.';
+    } else if (errorMessage.includes('Password')) {
+      errorMessage = 'Password must be at least 6 characters.';
+    } else if (errorMessage.includes('Invalid email')) {
+      errorMessage = 'Please enter a valid email address.';
+    } else if (errorMessage.includes('Network')) {
+      errorMessage = 'Network error. Please check your internet connection.';
     }
+    
     showToast(errorMessage, "error");
   }
 }
@@ -165,29 +152,29 @@ if (!navigator.onLine) {
 
 
 // Forgot Password Function
-async function forgotPassword() {
-  const email = prompt("Please enter your email address to reset your password:");
+// async function forgotPassword() {
+//   const email = prompt("Please enter your email address to reset your password:");
 
-  if (!email) {
-    showToast("Email is required", "error");
-    return;
-  }
+//   if (!email) {
+//     showToast("Email is required");
+//     return;
+//   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    showToast("Please enter a valid email address", "error");
-    return;
-  }
+//   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//   if (!emailRegex.test(email)) {
+//     showToast("Please enter a valid email address");
+//     return;
+//   }
 
-  try {
-    await auth.sendPasswordResetEmail(email);
-    showToast("Password reset email sent!", "success");
-  } catch (error) {
-    console.error("Password reset error:", error);
-    showToast(error.message, "error");
-  }
-}
-
+//   try {
+//     await auth.sendPasswordResetEmail(email);
+//     showToast("Password reset email sent!", "success");
+//   } catch (error) {
+//     console.error("Password reset error:");
+//     showToast("error");
+//   }
+// }
+// fix the above forgot password function security issues later
 // comment: This function handles password reset requests
 // Purpose: Allows users to reset forgotten passwords
 // Logic:
@@ -202,7 +189,7 @@ async function login(event) {
     event.preventDefault(); // Prevent form submission
   // Check if user is offline
 if (!navigator.onLine) {
-  showToast("Sorry, you are currently offline", "error");
+  showToast("Sorry, you are currently offline");
   return;
 }
 
@@ -211,7 +198,7 @@ if (!navigator.onLine) {
   const passwordInput = document.getElementById("password");
   
   if (!emailInput || !passwordInput) {
-    showToast('Form is incomplete or missing required fields.', 'error');
+    showToast('Form is incomplete or missing required fields.');
     return;
   }
 
@@ -220,64 +207,46 @@ if (!navigator.onLine) {
 
   // Validate fields are not empty
   if (!email || !password) {
-    showToast("Please fill in both email and password.", "error");
+    showToast("Please fill in both email and password.");
     return;
   }
 
   try {
-    if (!auth) {
-      console.error('Firebase auth not available', { auth });
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
+    // Check if API client is available
+    if (typeof window === 'undefined' || !window.api) {
+      showToast('API client not available. Please refresh the page.', 'error');
       return;
     }
-    
-    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
-    await auth.signInWithEmailAndPassword(email, password);
-    showToast("Logged in!", "success");
-    window.location.href = "./admin-profile.html";
+
+    // Login via API
+    const response = await window.api.auth.login({
+      email,
+      password,
+    });
+
+    if (response.success) {
+      showToast("Logged in!", "success");
+      window.location.href = "./admin-profile.html";
+    } else {
+      // Show the actual error message from the API
+      const errorMsg = response.message || "Login failed. Please check your credentials.";
+      showToast(errorMsg, "error");
+      console.error("Login failed:", response);
+    }
   } catch (error) {
     console.error("Login error:", error);
     
-    // Parse Firebase auth errors and provide user-friendly messages
-    let errorMessage = error.message;
+    // Provide user-friendly error messages
+    let errorMessage = error.message || "Login failed. Please try again.";
     
-    // Try to extract nested error information if present
-    if (error.message && error.message.includes('{')) {
-      try {
-        const jsonMatch = error.message.match(/\{.*\}/);
-        if (jsonMatch) {
-          const errorData = JSON.parse(jsonMatch[0]);
-          if (errorData.error && errorData.error.message) {
-            errorMessage = errorData.error.message;
-          }
-        }
-      } catch (e) {
-        // If parsing fails, use the original message
-      }
-    }
-    
-    // Map Firebase error codes to user-friendly messages
-    if (error.code === 'auth/user-not-found') {
-      errorMessage = 'No account found with this email address.';
-    } else if (error.code === 'auth/wrong-password') {
-      errorMessage = 'Incorrect password. Please try again.';
-    } else if (error.code === 'auth/invalid-email') {
-      errorMessage = 'Invalid email address format.';
-    } else if (error.code === 'auth/user-disabled') {
+    if (errorMessage.includes('Invalid email or password') || errorMessage.includes('INVALID_PASSWORD') || errorMessage.includes('EMAIL_NOT_FOUND')) {
+      errorMessage = 'Invalid email or password. Please check your credentials.';
+    } else if (errorMessage.includes('USER_DISABLED')) {
       errorMessage = 'This account has been disabled.';
-    } else if (error.code === 'auth/too-many-requests') {
-      errorMessage = 'Too many failed login attempts. Please try again later.';
-    } else if (error.code === 'auth/network-request-failed') {
+    } else if (errorMessage.includes('Network')) {
       errorMessage = 'Network error. Please check your internet connection.';
-    } else if (error.code === 'auth/internal-error') {
-      // Check if it's actually an invalid credentials error
-      if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('credential')) {
-        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-      } else {
-        errorMessage = 'An internal error occurred. Please try again later.';
-      }
-    } else if (error.code === 'auth/invalid-credential') {
-      errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+    } else if (errorMessage.includes('Authentication failed')) {
+      errorMessage = 'Authentication failed. Please try again.';
     }
     
     showToast(errorMessage, "error");
@@ -301,12 +270,20 @@ if (!navigator.onLine) {
 // Logout Function
 async function logout() {
   try {
-    await auth.signOut();
+    // Check if API client is available
+    if (typeof window !== 'undefined' && window.api) {
+      await window.api.auth.logout();
+    }
     showToast("Logged out!", "success");
     window.location.href = "./index.html";
   } catch (error) {
     console.error("Logout error:", error);
-    showToast(error.message, "error");
+    // Clear tokens locally even if API call fails
+    if (typeof window !== 'undefined' && window.api) {
+      window.api.token.clearTokens();
+    }
+    showToast("Logged out!", "success");
+    window.location.href = "./index.html";
   }
 }
 // comment: This function handles user logout
@@ -321,21 +298,50 @@ async function logout() {
 
 
 // Auth State Monitor
-firebase.auth().onAuthStateChanged((user) => {
-  const status = document.getElementById("userInfo");
-  if (user) {
-    if (status) status.innerText = `Logged in as: ${user.email}`;
-  } else {
-    if (window.location.pathname.includes("admin")) {
-      window.location.href = "./index.html";
+// Listen for auth events from API client
+function setupAuthStateMonitor() {
+  // Check initial auth state
+  if (typeof window !== 'undefined' && window.api) {
+    const isAuthenticated = window.api.auth.isAuthenticated();
+    const user = window.api.auth.getCurrentUserSync();
+    
+    const status = document.getElementById("userInfo");
+    if (user && isAuthenticated) {
+      if (status) status.innerText = `Logged in as: ${user.email}`;
+    } else {
+      // If on admin page and not authenticated, redirect to login
+      if (window.location.pathname.includes("admin") && !window.location.pathname.includes("login.html") && !window.location.pathname.includes("signup.html")) {
+        window.location.href = "./login.html";
+      }
     }
   }
-});
+
+  // Listen for auth events
+  window.addEventListener('auth:login', (event) => {
+    const user = event.detail;
+    const status = document.getElementById("userInfo");
+    if (status && user) {
+      status.innerText = `Logged in as: ${user.email}`;
+    }
+  });
+
+  window.addEventListener('auth:logout', () => {
+    const status = document.getElementById("userInfo");
+    if (status) {
+      status.innerText = '';
+    }
+    // Redirect to login if on admin page
+    if (window.location.pathname.includes("admin") && !window.location.pathname.includes("login.html") && !window.location.pathname.includes("signup.html")) {
+      window.location.href = "./login.html";
+    }
+  });
+}
 
 // comment: This function monitors user authentication state
 // Purpose: Monitors user login status across the app
 // Logic:
-// Listens for auth state changes (login/logout)
+// Checks initial auth state on page load
+// Listens for auth state change events (login/logout)
 // If user is logged in: updates status display (if element exists)
 // If user is logged out: redirects from dashboard to home page
 // Protects dashboard from unauthorized access
@@ -356,6 +362,8 @@ function setupMobileMenuToggle() {
 // Add Event Listener for Form Submission
 document.addEventListener("DOMContentLoaded", () => {
   setupMobileMenuToggle();
+  setupAuthStateMonitor();
+  
   // Signup form event listener
   const signupForm = document.getElementById("signupForm");
   if (signupForm) {
@@ -378,7 +386,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (forgotPasswordLink) {
     forgotPasswordLink.addEventListener("click", (e) => {
       e.preventDefault();
-      forgotPassword();
+      // forgotPassword(); // Commented out - implement later if needed
+      showToast("Password reset functionality coming soon", "info");
     });
   }
 });

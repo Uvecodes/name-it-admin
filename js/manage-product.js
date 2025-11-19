@@ -1,13 +1,11 @@
-// Firebase config, services, and toast are loaded from firebase-config.js
-// console.log() redec;laration to avoid errors in some environments
+// API Client - uses window.api from api-client.js
+// Firebase client SDK has been migrated to backend API
+
+console.log() //redec;laration to avoid errors in some environments
 console.log = function() {};
 console.warn = function() {};
 console.error = function() {};
 console.info = function() {};
-// Get Firebase services (use window if available, otherwise fallback to global firebase)
-const auth = (typeof window !== 'undefined' && window.auth) ? window.auth : (typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null);
-const db = (typeof window !== 'undefined' && window.db) ? window.db : (typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null);
-const storage = (typeof window !== 'undefined' && window.storage) ? window.storage : (typeof firebase !== 'undefined' && firebase.storage ? firebase.storage() : null);
 
 // Toast Notification System (if not already defined)
 function showToast(message, type = "success") {
@@ -25,7 +23,7 @@ function showToast(message, type = "success") {
       setTimeout(() => {
         toastEl.classList.add("hidden");
       }, 300);
-    }, 3000);
+    }, 2000);
     return;
   }
 
@@ -80,36 +78,37 @@ function formatDate(timestamp) {
   });
 }
 
-// Fetch products from Firestore
+// Fetch products from API
 async function fetchProducts() {
   try {
-    if (!db) {
-      console.error('Firestore not initialized');
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
+    if (typeof window === 'undefined' || !window.api) {
+      showToast('API client not available. Please refresh the page.', 'error');
       return;
     }
 
     // Check authentication
-    if (!auth || !auth.currentUser) {
+    if (!window.api.auth.isAuthenticated()) {
       console.error('User not authenticated');
       showToast('Please log in to view products', 'error');
       window.location.href = './login.html';
       return;
     }
 
-    const productsSnapshot = await db.collection('products')
-      .orderBy('createdAt', 'desc')
-      .get();
+    const response = await window.api.get('/products');
 
-    allProducts = productsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      popular: doc.data().popular === true, // Ensure boolean, default to false
-      ...doc.data()
-    }));
+    if (response.success && response.data) {
+      allProducts = response.data.map(product => ({
+        id: product.id,
+        popular: product.popular === true, // Ensure boolean, default to false
+        ...product
+      }));
 
-    filteredProducts = [...allProducts];
-    renderProducts();
-    renderPagination();
+      filteredProducts = [...allProducts];
+      renderProducts();
+      renderPagination();
+    } else {
+      showToast(response.message || 'Failed to load products', 'error');
+    }
   } catch (error) {
     console.error('Error fetching products:', error);
     showToast('Failed to load products. Please try again.', 'error');
@@ -229,8 +228,8 @@ function attachActionListeners() {
 // Handle toggle popular status
 async function handleTogglePopular(productId, makePopular) {
   try {
-    if (!db) {
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
+    if (typeof window === 'undefined' || !window.api) {
+      showToast('API client not available. Please refresh the page.', 'error');
       return;
     }
 
@@ -245,15 +244,18 @@ async function handleTogglePopular(productId, makePopular) {
       }
     }
 
-    // Update product in Firestore
-    await db.collection('products').doc(productId).update({
+    // Update product via API
+    const response = await window.api.patch(`/products/${productId}/popular`, {
       popular: makePopular
     });
 
-    showToast(makePopular ? 'Product marked as popular' : 'Product removed from popular', 'success');
-
-    // Refresh products list
-    await fetchProducts();
+    if (response.success) {
+      showToast(makePopular ? 'Product marked as popular' : 'Product removed from popular', 'success');
+      // Refresh products list
+      await fetchProducts();
+    } else {
+      showToast(response.message || 'Failed to update popular status', 'error');
+    }
   } catch (error) {
     console.error('Error toggling popular status:', error);
     showToast('Failed to update popular status. Please try again.', 'error');
@@ -305,6 +307,10 @@ function handleEditProduct(productId, event) {
         <div class="edit-field-group">
           <label for="edit-price-${productId}">Price (NGN)</label>
           <input type="number" id="edit-price-${productId}" value="${product.price || 0}" step="0.01" min="0" class="edit-input">
+        </div>
+        <div class="edit-field-group">
+          <label for="edit-count-${productId}">Product Count</label>
+          <input type="number" id="edit-count-${productId}" value="${product.count || 0}" step="1" min="0" class="edit-input">
         </div>
         <div class="edit-field-group">
           <label for="edit-status-${productId}">Status</label>
@@ -359,24 +365,26 @@ function handleEditProduct(productId, event) {
   cancelBtn.addEventListener('click', () => closeEditDropdown(productId));
   saveBtn.addEventListener('click', () => saveProductEdit(productId));
 
-  // Close dropdown when clicking outside
-  setTimeout(() => {
-    const closeOnOutsideClick = function(e) {
-      if (!dropdown.contains(e.target) && !editButton.contains(e.target)) {
-        closeEditDropdown(productId);
-        document.removeEventListener('click', closeOnOutsideClick);
-        document.removeEventListener('keydown', closeOnEscape);
-      }
-    };
-    
-    const closeOnEscape = function(e) {
-      if (e.key === 'Escape') {
-        closeEditDropdown(productId);
-        document.removeEventListener('click', closeOnOutsideClick);
-        document.removeEventListener('keydown', closeOnEscape);
-      }
-    };
+  // Store event listener references on the dropdown element so we can remove them later
+  const closeOnOutsideClick = function(e) {
+    if (!dropdown.contains(e.target) && !editButton.contains(e.target)) {
+      closeEditDropdown(productId);
+    }
+  };
+  
+  const closeOnEscape = function(e) {
+    if (e.key === 'Escape') {
+      closeEditDropdown(productId);
+    }
+  };
 
+  // Store references on the dropdown element
+  dropdown._closeOnOutsideClick = closeOnOutsideClick;
+  dropdown._closeOnEscape = closeOnEscape;
+  dropdown._editButton = editButton;
+
+  // Close dropdown when clicking outside (with a small delay to avoid immediate closure)
+  setTimeout(() => {
     document.addEventListener('click', closeOnOutsideClick);
     document.addEventListener('keydown', closeOnEscape);
   }, 100);
@@ -386,6 +394,15 @@ function handleEditProduct(productId, event) {
 function closeEditDropdown(productId) {
   const dropdown = document.getElementById(`edit-dropdown-${productId}`);
   if (dropdown) {
+    // Remove event listeners before removing the dropdown
+    if (dropdown._closeOnOutsideClick) {
+      document.removeEventListener('click', dropdown._closeOnOutsideClick);
+      delete dropdown._closeOnOutsideClick;
+    }
+    if (dropdown._closeOnEscape) {
+      document.removeEventListener('keydown', dropdown._closeOnEscape);
+      delete dropdown._closeOnEscape;
+    }
     dropdown.remove();
   }
 }
@@ -393,6 +410,15 @@ function closeEditDropdown(productId) {
 // Close all edit dropdowns
 function closeAllEditDropdowns() {
   document.querySelectorAll('.edit-dropdown').forEach(dropdown => {
+    // Remove event listeners before removing the dropdown
+    if (dropdown._closeOnOutsideClick) {
+      document.removeEventListener('click', dropdown._closeOnOutsideClick);
+      delete dropdown._closeOnOutsideClick;
+    }
+    if (dropdown._closeOnEscape) {
+      document.removeEventListener('keydown', dropdown._closeOnEscape);
+      delete dropdown._closeOnEscape;
+    }
     dropdown.remove();
   });
 }
@@ -410,10 +436,11 @@ async function saveProductEdit(productId) {
     const nameInput = document.getElementById(`edit-name-${productId}`);
     const descriptionInput = document.getElementById(`edit-description-${productId}`);
     const priceInput = document.getElementById(`edit-price-${productId}`);
+    const countInput = document.getElementById(`edit-count-${productId}`);
     const statusSelect = document.getElementById(`edit-status-${productId}`);
     const popularSelect = document.getElementById(`edit-popular-${productId}`);
 
-    if (!nameInput || !descriptionInput || !priceInput || !statusSelect || !popularSelect) {
+    if (!nameInput || !descriptionInput || !priceInput || !countInput || !statusSelect || !popularSelect) {
       showToast('Edit form not found', 'error');
       return;
     }
@@ -421,6 +448,7 @@ async function saveProductEdit(productId) {
     const newName = nameInput.value.trim();
     const newDescription = descriptionInput.value.trim();
     const newPrice = parseFloat(priceInput.value);
+    const newCount = parseInt(countInput.value);
     const newStatus = statusSelect.value;
     const newPopular = popularSelect.value === 'true';
 
@@ -440,6 +468,11 @@ async function saveProductEdit(productId) {
       return;
     }
 
+    if (isNaN(newCount) || newCount < 0) {
+      showToast('Please enter a valid product count (must be 0 or greater)', 'error');
+      return;
+    }
+
     // Validate popular status - max 4 popular products
     if (newPopular && !product.popular) {
       // Count popular products, excluding the current product
@@ -448,11 +481,6 @@ async function saveProductEdit(productId) {
         showToast('Maximum of 4 products can be popular at a time. Please remove a popular product first.', 'error');
         return;
       }
-    }
-
-    if (!db) {
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
-      return;
     }
 
     // Prepare update object
@@ -465,6 +493,9 @@ async function saveProductEdit(productId) {
     }
     if (newPrice !== product.price) {
       updates.price = newPrice;
+    }
+    if (newCount !== product.count) {
+      updates.count = newCount;
     }
     if (newStatus !== product.status) {
       updates.status = newStatus;
@@ -480,14 +511,22 @@ async function saveProductEdit(productId) {
       return;
     }
 
-    // Update product in Firestore
-    await db.collection('products').doc(productId).update(updates);
+    // Update product via API
+    if (typeof window === 'undefined' || !window.api) {
+      showToast('API client not available. Please refresh the page.', 'error');
+      return;
+    }
 
-    showToast('Product updated successfully', 'success');
-    closeEditDropdown(productId);
+    const response = await window.api.put(`/products/${productId}`, updates);
 
-    // Refresh products list
-    await fetchProducts();
+    if (response.success) {
+      showToast('Product updated successfully', 'success');
+      closeEditDropdown(productId);
+      // Refresh products list
+      await fetchProducts();
+    } else {
+      showToast(response.message || 'Failed to update product', 'error');
+    }
   } catch (error) {
     console.error('Error updating product:', error);
     showToast('Failed to update product. Please try again.', 'error');
@@ -501,38 +540,21 @@ async function handleDeleteProduct(productId) {
   }
 
   try {
-    if (!db) {
-      showToast('Firebase is not initialized. Please refresh the page.', 'error');
+    if (typeof window === 'undefined' || !window.api) {
+      showToast('API client not available. Please refresh the page.', 'error');
       return;
     }
 
-    // Get product to delete image if needed
-    const product = allProducts.find(p => p.id === productId);
-    
-    // Delete product from Firestore
-    await db.collection('products').doc(productId).delete();
+    // Delete product via API (backend handles image deletion)
+    const response = await window.api.delete(`/products/${productId}`);
 
-    // Optionally delete image from Storage
-    if (product && product.imageUrl) {
-      try {
-        // Extract file path from imageUrl
-        const imageUrl = product.imageUrl;
-        const urlParts = imageUrl.split('/o/');
-        if (urlParts.length > 1) {
-          const filePath = decodeURIComponent(urlParts[1].split('?')[0]);
-          const imageRef = storage.ref(filePath);
-          await imageRef.delete();
-        }
-      } catch (storageError) {
-        console.warn('Could not delete image from storage:', storageError);
-        // Continue even if image deletion fails
-      }
+    if (response.success) {
+      showToast('Product deleted successfully', 'success');
+      // Refresh products list
+      await fetchProducts();
+    } else {
+      showToast(response.message || 'Failed to delete product', 'error');
     }
-
-    showToast('Product deleted successfully', 'success');
-    
-    // Refresh products list
-    await fetchProducts();
   } catch (error) {
     console.error('Error deleting product:', error);
     showToast('Failed to delete product. Please try again.', 'error');
@@ -641,11 +663,31 @@ function setupMobileMenuToggle() {
   const sidebar = document.querySelector('.sidebar');
 
   if (!mobileToggle || !sidebar) {
+    console.warn('Mobile menu toggle or sidebar not found');
     return;
   }
 
-  mobileToggle.addEventListener('click', () => {
+  // Remove any existing event listeners by cloning the element
+  const newToggle = mobileToggle.cloneNode(true);
+  mobileToggle.parentNode.replaceChild(newToggle, mobileToggle);
+
+  // Add click event listener
+  newToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     sidebar.classList.toggle('mobile-open');
+    console.log('Mobile menu toggled, sidebar has mobile-open:', sidebar.classList.contains('mobile-open'));
+  });
+
+  // Close sidebar when clicking outside on mobile
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768) {
+      if (sidebar.classList.contains('mobile-open') && 
+          !sidebar.contains(e.target) && 
+          !newToggle.contains(e.target)) {
+        sidebar.classList.remove('mobile-open');
+      }
+    }
   });
 }
 
@@ -730,27 +772,26 @@ document.addEventListener('DOMContentLoaded', () => {
   setupMobileMenuToggle();
 
   // Check if Firebase services are available
-  if (!auth || !db) {
-    console.error('Firebase services not available', { auth, db });
-    showToast('Firebase is not initialized. Please refresh the page.', 'error');
+  if (typeof window === 'undefined' || !window.api) {
+    showToast('API client not available. Please refresh the page.', 'error');
     return;
   }
 
   // Check authentication
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      // User is signed in, fetch products
-      fetchProducts();
-      setupSearch();
-      setupCategoryFilter();
-      setupSort();
-    } else {
-      // User is not signed in, redirect to login
-      showToast('Please log in to access this page', 'error');
-      setTimeout(() => {
-        window.location.href = './login.html';
-      }, 1500);
-    }
+  if (!window.api.auth.isAuthenticated()) {
+    window.location.href = './login.html';
+    return;
+  }
+
+  // Listen for auth events
+  window.addEventListener('auth:logout', () => {
+    window.location.href = './login.html';
   });
+
+  // Initialize products
+  fetchProducts();
+  setupSearch();
+  setupCategoryFilter();
+  setupSort();
 });
 
