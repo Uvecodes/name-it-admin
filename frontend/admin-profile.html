@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name It Admin - Profile</title>
+    
+    <!-- Resource Hints for External Resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/admin-profile.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+
+
+    <!-- Toast utility - loaded before API client -->
+    <script src="./js/toast.js" defer></script>
+    <!-- API Client - Must be loaded first -->
+    <script src="./js/api-client.js" defer></script>
+    
+    <!-- Firebase client SDK removed - now using backend API -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script> -->
+
+
+
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="brand">Name It Admin</h1>
+        </div>
+        
+        <ul class="nav-menu">
+            <!-- <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li> -->
+            <li><a href="./add-products.html" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
+            <li><a href="./manage-products.html" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
+            <li><a href="./admin-order.html" class="nav-link"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <li class="nav-divider"></li>
+            <li><a href="./admin-profile.html" class="nav-link active"><i class="fas fa-user"></i>Profile</a></li>
+            <li><a href="#" class="nav-link" id="logout-btn" onClick="logout()"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
+        </ul>
+    </nav>
+
+    <!-- Mobile Menu Toggle (Placeholder) -->
+    <button class="mobile-menu-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Header Bar -->
+        <header class="header">
+            <div class="header-content">
+                <h2>Profile Settings</h2>
+                <div class="header-actions">
+                    <span class="admin-name">Admin User</span>
+                    <div class="admin-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Profile Container -->
+        <div class="profile-container">
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar-section">
+                    <div class="profile-avatar">
+                        <img src="https://via.placeholder.com/120x120" alt="Admin Avatar" id="avatar-preview">
+                        <div class="avatar-overlay">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                    </div>
+                    <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('avatar-upload').click()">
+                        <i class="fas fa-upload"></i>
+                        Change Photo
+                    </button>
+                </div>
+                <div class="profile-info">
+                    <h1 class="profile-name">--</h1>
+                    <p class="profile-role">--</p>
+                    <p class="profile-email">--</p>
+                    <div class="profile-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">--</span>
+                            <span class="stat-label">Products</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">--</span>
+                            <span class="stat-label">Orders</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">--</span>
+                            <span class="stat-label">Revenue</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Content -->
+            <div class="profile-content">
+                <!-- Personal Information -->
+                <div class="profile-section">
+                    <div class="section-header">
+                        <h3>Personal Information</h3>
+                        <button class="btn btn-primary btn-sm" id="edit-personal">
+                            <i class="fas fa-edit"></i>
+                            Edit
+                        </button>
+                    </div>
+                    
+                    <form class="profile-form" id="personal-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="first-name">First Name</label>
+                                <input type="text" id="first-name" name="first-name" value="Cureently unavailable" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label for="last-name">Last Name</label>
+                                <input type="text" id="last-name" name="last-name" value="Cureently unavailable" disabled>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" name="email" value="Cureently unavailable" disabled>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <input type="tel" id="phone" name="phone" value="Currently unavailable" disabled>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="bio">Bio</label>
+                            <textarea id="bio" name="bio" rows="3" disabled>Currently unavailable</textarea>
+                        </div>
+                        
+                        <div class="form-actions" id="personal-actions" style="display: none;">
+                            <button type="button" class="btn btn-secondary" id="cancel-personal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Security Settings -->
+                <div class="profile-section">
+                    <div class="section-header">
+                        <h3>Security Settings</h3>
+                    </div>
+                    
+                    <form class="profile-form">
+                        <div class="form-group">
+                            <label for="current-password">Current Password</label>
+                            <div class="input-group">
+                                <!-- <i class="fas fa-lock"></i> -->
+                                <input type="password" id="current-password" name="current-password" placeholder="Enter current password">
+                                <button type="button" class="password-toggle">
+                                    <!-- <i class="fas fa-eye"></i> -->
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="new-password">New Password</label>
+                            <div class="input-group">
+                                <!-- <i class="fas fa-lock"></i> -->
+                                <input type="password" id="new-password" name="new-password" placeholder="Enter new password">
+                                <button type="button" class="password-toggle">
+                                    <!-- <i class="fas fa-eye"></i> -->
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="confirm-new-password">Confirm New Password</label>
+                            <div class="input-group">
+                                <!-- <i class="fas fa-lock"></i> -->
+                                <input type="password" id="confirm-new-password" name="confirm-new-password" placeholder="Confirm new password">
+                                <button type="button" class="password-toggle">
+                                    <!-- <i class="fas fa-eye"></i> -->
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <!-- <i class="fas fa-shield-alt"></i> -->
+                            Update Password
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Notification Settings -->
+                <div class="profile-section">
+                    <div class="section-header">
+                        <h3>Notification Settings</h3>
+                    </div>
+                    
+                    <div class="notification-settings">
+                        <div class="notification-item">
+                            <div class="notification-info">
+                                <h4>Email Notifications</h4>
+                                <p>Receive email updates about orders and products</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="notification-item">
+                            <div class="notification-info">
+                                <h4>Order Alerts</h4>
+                                <p>Get notified when new orders are placed</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="notification-item">
+                            <div class="notification-info">
+                                <h4>Product Updates</h4>
+                                <p>Notifications about product inventory changes</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="notification-item">
+                            <div class="notification-info">
+                                <h4>Weekly Reports</h4>
+                                <p>Receive weekly performance summaries</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- Firebase config removed - now using backend API -->
+    <!-- <script src="./js/firebase-config.js"></script> -->
+    <script src="./js/auth.js" defer></script>
+    <script src="./js/admin-profile.js" defer></script>
+    
+    <!-- Toast container for user notifications -->
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
+</body>
+</html> 

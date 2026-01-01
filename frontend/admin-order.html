@@ -1,0 +1,430 @@
+<!-- NOTE THAT FOR THE ORDER HANDLING A FUNCTIONALITY AND FEATURE WILL
+  BE BUILT SO THAT THE ADMIN CAN UPDATE IF AN ORDER HAS BEEN 
+  SHIPPED OR NOT OR DELIVERED. IN THAT FUNCTIONALITY 
+  THE ADMIN SHOULD ALSO HAVE A SPACE TO INPUT A COMMENT 
+  INCASE THE ADMIN DECIDES TO CANCEL THE ORDER HIMSELF OR HERSELF -->
+
+  <!-- ALSO ADD AN AI FEATURE TO THIS ADMIN DEPARTMENT THAT CAN HANDLE PRODUCT CREATION SO THAT THE ADMIN CAN PROMPT THE AI ABOUT THE PRODUCT AND THE AI CREATES THE PRODUCT -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name It Admin - Orders</title>
+    
+    <!-- Resource Hints for External Resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/admin-order.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Toast utility - loaded before API client -->
+    <script src="./js/toast.js" defer></script>
+    <!-- API Client - Must be loaded first -->
+    <script src="./js/api-client.js" defer></script>
+    
+    <!-- Firebase Scripts for real-time order updates -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+
+
+
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="brand">Name It Admin</h1>
+        </div>
+        
+        <ul class="nav-menu">
+            <!-- <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li> -->
+            <li><a href="./add-products.html" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
+            <li><a href="./manage-products.html" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
+            <li><a href="./admin-order.html" class="nav-link active"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <li><a href="./admin-profile.html" class="nav-link active"><i class="fas fa-user"></i>Profile</a></li>
+            <li class="nav-divider"></li>
+            <li><a href="index.html" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
+        </ul>
+    </nav>
+
+    <!-- Mobile Menu Toggle (Placeholder) -->
+    <button class="mobile-menu-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Header Bar -->
+        <header class="header">
+            <div class="header-content">
+                <h2>Order Management</h2>
+                <div class="header-actions" style="display: flex; align-items: center; gap: 1rem;">
+                    <div class="realtime-toggle">
+                        <div class="realtime-status inactive" id="realtimeStatus" title="Firebase Real-time Connection Status">
+                            <i class="fas fa-circle"></i>
+                            <span>Real-time: Off</span>
+                        </div>
+                        <button class="btn-refresh" id="refreshBtn" title="Refresh Orders">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                    <span class="admin-name">Admin User</span>
+                    <div class="admin-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Orders Container -->
+        <div class="orders-container">
+            <!-- Orders Stats -->
+            <div class="orders-stats">
+                <div class="stat-card clickable-stat" data-stat-type="total" onclick="showAnalyticsDashboard('total')">
+                    <div class="stat-icon">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Total Orders</h3>
+                        <p class="stat-number">0</p>
+                        <span class="stat-change positive">0%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card clickable-stat" data-stat-type="pending" onclick="showAnalyticsDashboard('pending')">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Pending</h3>
+                        <p class="stat-number">0</p>
+                        <span class="stat-change negative">0%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card clickable-stat" data-stat-type="completed" onclick="showAnalyticsDashboard('completed')">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Completed</h3>
+                        <p class="stat-number">0</p>
+                        <span class="stat-change positive">0%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card clickable-stat" data-stat-type="revenue" onclick="showAnalyticsDashboard('revenue')">
+                    <div class="stat-icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Revenue</h3>
+                        <p class="stat-number">$0</p>
+                        <span class="stat-change positive">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="search-input" placeholder="Search orders by ID, customer, or product...">
+                </div>
+                
+                <div class="filter-options">
+                    <select class="filter-select">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    
+                    <select class="filter-select">
+                        <option value="">All Categories</option>
+                        <option value="perfume">Perfume</option>
+                        <option value="clothes">Clothes</option>
+                    </select>
+                    
+                    <input type="date" class="filter-date" value="2024-01-01">
+                    
+                    <button class="btn btn-primary">
+                        <i class="fas fa-filter"></i>
+                        Filter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Orders Table -->
+            <div class="table-container">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Payment Status</th>
+                            <th>Date</th>
+                            <th>Mark as Paid</th>
+                            <th>Reject</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Orders will be dynamically loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button class="pagination-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="pagination-btn active">1</button>
+                <button class="pagination-btn">2</button>
+                <button class="pagination-btn">3</button>
+                <span class="pagination-dots">...</span>
+                <button class="pagination-btn">12</button>
+                <button class="pagination-btn">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Firebase Configuration -->
+    <script>
+      // Firebase Configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyBNlcypjh6hCAbn7WCVVYPhtHNjBOVm2Cg",
+        authDomain: "name-it-e674c.firebaseapp.com",
+        projectId: "name-it-e674c",
+        storageBucket: "name-it-e674c.firebasestorage.app",
+        messagingSenderId: "299394886026",
+        appId: "1:299394886026:web:ca4e737e214c858ee08073",
+        measurementId: "G-6DSQ7Y1F5E",
+      };
+
+      // Initialize Firebase (only if not already initialized)
+      if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+    </script>
+    
+    <script src="./js/auth.js" defer></script>
+    <script src="./js/admin-order.js" defer></script>
+    
+    <!-- Toast container for user notifications -->
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
+    
+    <!-- View Order Modal -->
+    <div id="viewOrderModal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h3 id="viewOrderTitle">Order Details</h3>
+                <button class="modal-close" id="viewOrderModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body view-order-body">
+                <div class="view-order-section">
+                    <h4 class="view-order-section-title">Order Information</h4>
+                    <div class="view-order-grid">
+                        <div class="view-order-item">
+                            <span class="view-order-label">Order ID:</span>
+                            <span class="view-order-value" id="viewOrderId">-</span>
+                        </div>
+                        <div class="view-order-item">
+                            <span class="view-order-label">Status:</span>
+                            <span class="view-order-value" id="viewOrderStatus">-</span>
+                        </div>
+                        <div class="view-order-item">
+                            <span class="view-order-label">Created At:</span>
+                            <span class="view-order-value" id="viewOrderCreatedAt">-</span>
+                        </div>
+                        <div class="view-order-item">
+                            <span class="view-order-label">Last Updated:</span>
+                            <span class="view-order-value" id="viewOrderUpdatedAt">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="view-order-section">
+                    <h4 class="view-order-section-title">Customer Information</h4>
+                    <div class="view-order-customer">
+                        <div class="view-order-customer-avatar" id="viewOrderCustomerAvatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="view-order-customer-details">
+                            <div class="view-order-item">
+                                <span class="view-order-label">Name:</span>
+                                <span class="view-order-value" id="viewOrderCustomerName">-</span>
+                            </div>
+                            <div class="view-order-item">
+                                <span class="view-order-label">Email:</span>
+                                <span class="view-order-value" id="viewOrderCustomerEmail">-</span>
+                            </div>
+                            <div class="view-order-item">
+                                <span class="view-order-label">Phone:</span>
+                                <span class="view-order-value" id="viewOrderCustomerPhone">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="view-order-section">
+                    <h4 class="view-order-section-title">Shipping Address</h4>
+                    <div class="view-order-address" id="viewOrderAddress">
+                        <p>-</p>
+                    </div>
+                </div>
+
+                <div class="view-order-section">
+                    <h4 class="view-order-section-title">Products</h4>
+                    <div class="view-order-products" id="viewOrderProducts">
+                        <!-- Products will be populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="view-order-section">
+                    <h4 class="view-order-section-title">Order Summary</h4>
+                    <div class="view-order-summary">
+                        <div class="view-order-summary-row">
+                            <span class="view-order-label">Subtotal:</span>
+                            <span class="view-order-value" id="viewOrderSubtotal">$0.00</span>
+                        </div>
+                        <div class="view-order-summary-row">
+                            <span class="view-order-label">Total:</span>
+                            <span class="view-order-value view-order-total" id="viewOrderTotal">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="view-order-section" id="viewOrderNotesSection" style="display: none;">
+                    <h4 class="view-order-section-title">Notes</h4>
+                    <div class="view-order-notes" id="viewOrderNotes">
+                        <p>-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="viewOrderCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-small">
+            <div class="modal-header">
+                <h3 id="confirmationTitle">Confirm Action</h3>
+                <button class="modal-close" id="confirmationModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmationMessage">Are you sure you want to proceed?</p>
+                <div id="confirmationInputContainer" style="display: none; margin-top: 1rem;">
+                    <label for="confirmationInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Reason (optional):</label>
+                    <textarea id="confirmationInput" class="modal-textarea" rows="3" placeholder="Enter reason..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="confirmationCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmationConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Order Modal -->
+    <div id="editOrderModal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-medium">
+            <div class="modal-header">
+                <h3>Edit Order</h3>
+                <button class="modal-close" id="editOrderModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="editOrderStatus" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Status:</label>
+                    <select id="editOrderStatus" class="modal-select">
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="paid">Paid</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="editOrderNotes" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Notes (optional):</label>
+                    <textarea id="editOrderNotes" class="modal-textarea" rows="4" placeholder="Add notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="editOrderCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="editOrderSaveBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Dashboard Modal -->
+    <div id="analyticsDashboardModal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-dashboard">
+            <div class="modal-header">
+                <h3 id="dashboardTitle">Analytics Dashboard</h3>
+                <button class="modal-close" id="dashboardModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body dashboard-body">
+                <div class="dashboard-stats-row">
+                    <div class="dashboard-stat-card">
+                        <div class="dashboard-stat-label" id="dashboardMainLabel">Total</div>
+                        <div class="dashboard-stat-value" id="dashboardMainValue">0</div>
+                        <div class="dashboard-stat-change" id="dashboardMainChange">
+                            <span class="change-indicator positive">0%</span>
+                            <span class="change-label">vs last 30 days</span>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-container">
+                        <canvas id="dashboardMainChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="dashboard-details-grid">
+                    <div class="dashboard-detail-card">
+                        <h4 id="dashboardDetailTitle1">Breakdown</h4>
+                        <div class="dashboard-detail-content" id="dashboardDetailContent1">
+                            <canvas id="dashboardBreakdownChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="dashboard-detail-card">
+                        <h4 id="dashboardDetailTitle2">Recent Activity</h4>
+                        <div class="dashboard-detail-list" id="dashboardDetailContent2">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="dashboardModalCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

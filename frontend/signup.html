@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name It Admin - Sign Up</title>
+    
+    <!-- Resource Hints for External Resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/auth.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+
+    <!-- Toast utility - loaded before API client -->
+    <script src="./js/toast.js" defer></script>
+    <!-- API Client - Must be loaded first -->
+    <script src="./js/api-client.js" defer></script>
+    
+    <!-- Firebase client SDK removed - now using backend API -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script> -->
+
+
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="brand">Name It Admin</h1>
+        </div>
+        
+        <ul class="nav-menu">
+            <li><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt"></i>Back Home</a></li>
+            <!-- <li><a href="#" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
+            <li><a href="#" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
+            <li><a href="#" class="nav-link"><i class="fas fa-shopping-cart"></i>Orders</a></li>
+            <li class="nav-divider"></li> -->
+            
+        </ul>
+    </nav>
+
+    <!-- Mobile Menu Toggle (Placeholder) -->
+    <button class="mobile-menu-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Header Bar -->
+        <header class="header">
+            <div class="header-content">
+                <h2>Sign Up</h2>
+                <!-- <div class="header-actions">
+                    <span class="admin-name">Admin User</span>
+                    <div class="admin-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div> -->
+            </div>
+        </header>
+
+        <!-- Signup Container -->
+        <div class="auth-container">
+            <div class="auth-content">
+                <div class="auth-header">
+                    <div class="auth-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h1 class="auth-title">Create Account</h1>
+                    <p class="auth-subtitle">Join the admin team</p>
+                </div>
+                
+                <form class="auth-form" id="signupForm">
+
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <div class="input-group">
+                            <!-- <i class="fas fa-envelope"></i> -->
+                            <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+                        </div>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <div class="input-group">
+                            <!-- <i class="fas fa-envelope"></i> -->
+                            <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-group">
+                            <!-- <i class="fas fa-lock"></i> -->
+                            <input type="password" id="password" name="password" placeholder="Create a password" minlength="8" required>
+                            <button type="button" class="password-toggle">
+                                <!-- <i class="fas fa-eye"></i> -->
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirm-password">Confirm Password</label>
+                        <div class="input-group">
+                            <!-- <i class="fas fa-lock"></i> -->
+                            <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your password" required>
+                            <button type="button" class="password-toggle">
+                                <!-- <i class="fas fa-eye"></i> -->
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="terms" required>
+                            <!-- <span class="checkmark"></span> -->
+                          
+                        </label>
+                        <span>
+                              I agree to the <a href="#" class="auth-link">Terms of Service</a> and <a href="#" class="auth-link">Privacy Policy</a>
+                          </span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="fas fa-user-plus"></i>
+                        Create Account
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="login.html" class="auth-link">Sign in</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+     
+    <!-- Firebase config removed - now using backend API -->
+    <!-- <script src="./js/firebase-config.js"></script> -->
+    <script src="./js/auth.js" defer></script>
+
+    <!-- Toast container for user notifications -->
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
+</body>
+</html>

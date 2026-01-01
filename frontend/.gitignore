@@ -1,0 +1,11 @@
+# firebase config files
+config.js
+firebase-config.js
+firebase-config2.js
+
+# bin files
+bin/
+
+# legacy/unused JavaScript files
+js/add-product2.js
+js/add-product3-1grok.js

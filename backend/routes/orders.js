@@ -4,7 +4,12 @@ const router = express.Router();
 const { db } = require('../config');
 const { sendSuccess, sendError, asyncHandler } = require('../utils/api-helpers');
 const { verifyToken } = require('../middleware/auth');
-const { getCollection: getFirestoreCollection, getDocument: getFirestoreDocument } = require('../utils/firestore-rest');
+const { 
+  getCollection: getFirestoreCollection, 
+  getDocument: getFirestoreDocument,
+  createDocument: createFirestoreDocument,
+  deleteDocument: deleteFirestoreDocument
+} = require('../utils/firestore-rest');
 
 /**
  * GET /api/orders/stats
@@ -255,29 +260,87 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
  */
 router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
   try {
-    const orderDoc = await db.collection('orders').doc(req.params.id).get();
+    // Get the ID token for REST API calls
+    const authHeader = req.headers.authorization;
+    const idToken = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.split('Bearer ')[1] 
+      : null;
 
-    if (!orderDoc.exists) {
-      return sendError(res, 'Order not found', 404);
+    let order = null;
+
+    // Try Admin SDK first
+    if (db && typeof db.collection === 'function') {
+      try {
+        const orderDoc = await db.collection('orders').doc(req.params.id).get();
+
+        if (!orderDoc.exists) {
+          return sendError(res, 'Order not found', 404);
+        }
+
+        const data = orderDoc.data();
+        order = {
+          id: orderDoc.id,
+          orderId: data.orderId || `#ORD-${orderDoc.id.substring(0, 6).toUpperCase()}`,
+          customer: {
+            name: data.customerName || data.customer?.name || 'Unknown',
+            email: data.customerEmail || data.customer?.email || '',
+            avatar: data.customerAvatar || data.customer?.avatar || null,
+          },
+          products: data.products || data.items || [],
+          total: parseFloat(data.total || data.amount || 0),
+          status: data.status || 'pending',
+          createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
+          updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
+          shippingAddress: data.shippingAddress || null,
+          notes: data.notes || data.comments || null,
+        };
+      } catch (adminError) {
+        console.warn('Admin SDK failed, trying REST API:', adminError.message);
+        // Fallback to REST API
+        const orderData = await getFirestoreDocument('orders', req.params.id, idToken);
+        if (!orderData) {
+          return sendError(res, 'Order not found', 404);
+        }
+        order = {
+          id: orderData.id,
+          orderId: orderData.orderId || `#ORD-${orderData.id?.substring(0, 6).toUpperCase() || 'N/A'}`,
+          customer: {
+            name: orderData.customerName || orderData.customer?.name || 'Unknown',
+            email: orderData.customerEmail || orderData.customer?.email || '',
+            avatar: orderData.customerAvatar || orderData.customer?.avatar || null,
+          },
+          products: orderData.products || orderData.items || [],
+          total: parseFloat(orderData.total || orderData.amount || 0),
+          status: orderData.status || 'pending',
+          createdAt: orderData.createdAt || null,
+          updatedAt: orderData.updatedAt || null,
+          shippingAddress: orderData.shippingAddress || null,
+          notes: orderData.notes || orderData.comments || null,
+        };
+      }
+    } else {
+      // Use REST API directly
+      const orderData = await getFirestoreDocument('orders', req.params.id, idToken);
+      if (!orderData) {
+        return sendError(res, 'Order not found', 404);
+      }
+      order = {
+        id: orderData.id,
+        orderId: orderData.orderId || `#ORD-${orderData.id?.substring(0, 6).toUpperCase() || 'N/A'}`,
+        customer: {
+          name: orderData.customerName || orderData.customer?.name || 'Unknown',
+          email: orderData.customerEmail || orderData.customer?.email || '',
+          avatar: orderData.customerAvatar || orderData.customer?.avatar || null,
+        },
+        products: orderData.products || orderData.items || [],
+        total: parseFloat(orderData.total || orderData.amount || 0),
+        status: orderData.status || 'pending',
+        createdAt: orderData.createdAt || null,
+        updatedAt: orderData.updatedAt || null,
+        shippingAddress: orderData.shippingAddress || null,
+        notes: orderData.notes || orderData.comments || null,
+      };
     }
-
-    const data = orderDoc.data();
-    const order = {
-      id: orderDoc.id,
-      orderId: data.orderId || `#ORD-${orderDoc.id.substring(0, 6).toUpperCase()}`,
-      customer: {
-        name: data.customerName || data.customer?.name || 'Unknown',
-        email: data.customerEmail || data.customer?.email || '',
-        avatar: data.customerAvatar || data.customer?.avatar || null,
-      },
-      products: data.products || data.items || [],
-      total: parseFloat(data.total || data.amount || 0),
-      status: data.status || 'pending',
-      createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
-      updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
-      shippingAddress: data.shippingAddress || null,
-      notes: data.notes || data.comments || null,
-    };
 
     return sendSuccess(res, order, 'Order retrieved successfully');
   } catch (error) {
@@ -298,17 +361,16 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
       return sendError(res, 'Status is required', 400);
     }
 
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'paid', 'rejected'];
     if (!validStatuses.includes(status.toLowerCase())) {
       return sendError(res, `Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
     }
 
-    const orderRef = db.collection('orders').doc(req.params.id);
-    const orderDoc = await orderRef.get();
-
-    if (!orderDoc.exists) {
-      return sendError(res, 'Order not found', 404);
-    }
+    // Get the ID token for REST API calls
+    const authHeader = req.headers.authorization;
+    const idToken = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.split('Bearer ')[1] 
+      : null;
 
     const updateData = {
       status: status.toLowerCase(),
@@ -320,7 +382,42 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
       updateData.comments = notes; // Also update comments field for compatibility
     }
 
-    await orderRef.update(updateData);
+    // Handle rejectedReason if status is rejected
+    if (status.toLowerCase() === 'rejected' && req.body.rejectedReason) {
+      updateData.rejectedReason = req.body.rejectedReason;
+    }
+
+    // Try Admin SDK first
+    if (db && typeof db.collection === 'function') {
+      try {
+        const orderRef = db.collection('orders').doc(req.params.id);
+        const orderDoc = await orderRef.get();
+
+        if (!orderDoc.exists) {
+          return sendError(res, 'Order not found', 404);
+        }
+
+        await orderRef.update(updateData);
+      } catch (adminError) {
+        console.warn('Admin SDK failed, trying REST API:', adminError.message);
+        // Fallback to REST API
+        // First check if order exists
+        const existingOrder = await getFirestoreDocument('orders', req.params.id, idToken);
+        if (!existingOrder) {
+          return sendError(res, 'Order not found', 404);
+        }
+        // Update using createDocument with docId (which performs PATCH)
+        await createFirestoreDocument('orders', updateData, idToken, req.params.id);
+      }
+    } else {
+      // Use REST API directly
+      const existingOrder = await getFirestoreDocument('orders', req.params.id, idToken);
+      if (!existingOrder) {
+        return sendError(res, 'Order not found', 404);
+      }
+      // Update using createDocument with docId (which performs PATCH)
+      await createFirestoreDocument('orders', updateData, idToken, req.params.id);
+    }
 
     return sendSuccess(res, { status: updateData.status, notes: updateData.notes }, 'Order status updated successfully');
   } catch (error) {
@@ -335,14 +432,43 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
  */
 router.delete('/:id', verifyToken, asyncHandler(async (req, res) => {
   try {
-    const orderRef = db.collection('orders').doc(req.params.id);
-    const orderDoc = await orderRef.get();
+    // Get the ID token for REST API calls
+    const authHeader = req.headers.authorization;
+    const idToken = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.split('Bearer ')[1] 
+      : null;
 
-    if (!orderDoc.exists) {
-      return sendError(res, 'Order not found', 404);
+    // Try Admin SDK first
+    if (db && typeof db.collection === 'function') {
+      try {
+        const orderRef = db.collection('orders').doc(req.params.id);
+        const orderDoc = await orderRef.get();
+
+        if (!orderDoc.exists) {
+          return sendError(res, 'Order not found', 404);
+        }
+
+        await orderRef.delete();
+      } catch (adminError) {
+        console.warn('Admin SDK failed, trying REST API:', adminError.message);
+        // Fallback to REST API
+        // First check if order exists
+        const existingOrder = await getFirestoreDocument('orders', req.params.id, idToken);
+        if (!existingOrder) {
+          return sendError(res, 'Order not found', 404);
+        }
+        // Delete using REST API
+        await deleteFirestoreDocument('orders', req.params.id, idToken);
+      }
+    } else {
+      // Use REST API directly
+      const existingOrder = await getFirestoreDocument('orders', req.params.id, idToken);
+      if (!existingOrder) {
+        return sendError(res, 'Order not found', 404);
+      }
+      // Delete using REST API
+      await deleteFirestoreDocument('orders', req.params.id, idToken);
     }
-
-    await orderRef.delete();
 
     return sendSuccess(res, null, 'Order deleted successfully');
   } catch (error) {

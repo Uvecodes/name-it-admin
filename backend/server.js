@@ -95,7 +95,26 @@ app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
 });
+
+// Handle server startup errors
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+    console.error(`Please either:`);
+    console.error(`  1. Stop the process using port ${PORT}`);
+    console.error(`  2. Set a different PORT via environment variable: PORT=3002 npm start`);
+    console.error(`  3. Kill the process using: netstat -ano | findstr :${PORT} (Windows)`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server failed to start:', error);
+    process.exit(1);
+  }
+});
+
+
+
+

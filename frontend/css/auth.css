@@ -1,0 +1,209 @@
+/* Authentication Pages */
+.auth-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.auth-content {
+    background: white;
+    border-radius: 12px;
+    padding: 3rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    max-width: 500px;
+    width: 100%;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.auth-icon {
+    width: 80px;
+    height: 80px;
+    background: var(--gradient-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.auth-icon i {
+    font-size: 2rem;
+    color: white;
+}
+
+.auth-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.5px;
+}
+
+.auth-subtitle {
+    font-size: 1rem;
+    color: #666;
+    line-height: 1.6;
+}
+
+.auth-form {
+    margin-bottom: 2rem;
+}
+
+
+
+
+
+/* Input Groups */
+.input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-group i {
+    position: absolute;
+    left: 1rem;
+    color: #666;
+    font-size: 14px;
+    z-index: 1;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    background: white;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.input-group input::placeholder {
+    color: #999;
+}
+
+/* Password Toggle */
+.password-toggle {
+    position: absolute;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    transition: color 0.2s;
+}
+
+.password-toggle:hover {
+    color: #1a1a1a;
+}
+
+/* Form Options */
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.forgot-link {
+    color: #1a1a1a;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.forgot-link:hover {
+    color: #666;
+}
+
+/* Checkbox Styles */
+.checkbox-label {
+    /* display: inline-block; */
+    /* align-items: flex-start; */
+    /* gap: 0.75rem; */
+    cursor: pointer;
+    /* font-size: 14px; */
+    /* color: #666; */
+    /* line-height: 1.5; */
+    position: relative;
+    right: 13.5rem;
+    top:2.2rem
+}
+
+/* .checkbox-label input[type="checkbox"] {
+    display: block;
+} */
+
+/* .checkmark {
+    width: 10rem;
+    height: 10rem;
+    border: .4rem solid red;
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+} */
+
+/* .checkmark{
+    position:relative;
+    flex-shrink: 0;
+    transition: all 0.2s;
+} */
+
+/* .checkbox-label input[type="checkbox"]:checked + .checkmark {
+    background: var(--gradient-primary);
+     border-color: var(--primary-color);
+    } */
+
+
+/* .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+    /* content: '\f00c';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900; 
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 10px;
+} */
+
+/* Auth Footer */
+.auth-footer {
+    text-align: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.auth-footer p {
+    color: #666;
+    font-size: 14px;
+}
+
+.auth-link {
+    color: #1a1a1a;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.auth-link:hover {
+    color: #666;
+}
