@@ -19,6 +19,7 @@
       pendingOrders: 0,
       completedOrders: 0,
       revenue: 0,
+      totalCost: 0,
     },
     filters: {
       status: '',
@@ -55,10 +56,18 @@
 
   // Utility Functions
   function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'NGN',
+      currencyDisplay: 'symbol',
     }).format(amount);
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   function formatDate(date) {
@@ -124,22 +133,23 @@
     }
   }
 
-  async function fetchOrders() {
-    // If using Firebase real-time, don't fetch via API
-    if (state.useFirebaseRealtime) {
-      console.log('Using Firebase real-time listener, skipping API fetch');
+  async function fetchOrders(forAnalytics = false) {
+    // If using Firebase real-time, don't fetch via API unless for analytics
+      if (state.useFirebaseRealtime && !forAnalytics) {
       return;
     }
 
     try {
       if (typeof window === 'undefined' || !window.api) {
         console.error('API client not available');
-        showToast('API client not available. Please refresh the page.', 'error');
+        if (!forAnalytics) {
+          showToast('API client not available. Please refresh the page.', 'error');
+        }
         return;
       }
 
-      // Show loading state
-      if (elements.ordersTable) {
+      // Show loading state only if not for analytics
+      if (!forAnalytics && elements.ordersTable) {
         elements.ordersTable.innerHTML = `
           <tr>
             <td colspan="8" style="text-align: center; padding: 2rem;">
@@ -150,44 +160,59 @@
       }
 
       const params = new URLSearchParams();
-      if (state.filters.status) {
-        params.append('status', state.filters.status);
+      // For analytics, fetch ALL orders without filters to get complete data
+      if (!forAnalytics) {
+        if (state.filters.status) {
+          params.append('status', state.filters.status);
+        }
+        if (state.filters.date) {
+          params.append('startDate', state.filters.date);
+        }
       }
-      if (state.filters.date) {
-        params.append('startDate', state.filters.date);
+      // For analytics, increase limit to get more orders
+      if (forAnalytics) {
+        params.append('limit', '1000'); // Get up to 1000 orders for analytics
       }
 
       const queryString = params.toString();
       const endpoint = queryString ? `/orders?${queryString}` : '/orders';
       
-      console.log('Fetching orders from:', endpoint);
       const response = await window.api.get(endpoint);
-      
-      console.log('Orders response:', response);
       
       if (response && response.success && Array.isArray(response.data)) {
         // Normalize order data to handle different formats
-        state.orders = response.data.map(order => normalizeOrder(order));
-        console.log('Normalized orders:', state.orders);
-        applyFilters();
-        renderOrders();
+        const normalizedOrders = response.data.map(order => normalizeOrder(order));
         
-        if (state.orders.length === 0) {
-          showToast('No orders found', 'info');
+        if (forAnalytics) {
+          // For analytics, store all orders without filtering
+          state.orders = normalizedOrders;
         } else {
-          showToast(`Loaded ${state.orders.length} order(s)`, 'success');
+          // For regular table view, apply filters
+          state.orders = normalizedOrders;
+          applyFilters();
+          renderOrders();
+          
+          if (state.orders.length === 0) {
+            showToast('No orders found', 'info');
+          } else {
+            showToast(`Loaded ${state.orders.length} order(s)`, 'success');
+          }
         }
       } else {
         console.warn('Invalid response format:', response);
         state.orders = [];
-        renderOrders();
-        showToast('Failed to load orders. Invalid response format.', 'error');
+        if (!forAnalytics) {
+          renderOrders();
+          showToast('Failed to load orders. Invalid response format.', 'error');
+        }
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
       state.orders = [];
-      renderOrders();
-      showToast('Failed to load orders: ' + (error.message || 'Unknown error'), 'error');
+      if (!forAnalytics) {
+        renderOrders();
+        showToast('Failed to load orders: ' + (error.message || 'Unknown error'), 'error');
+      }
     }
   }
 
@@ -228,30 +253,15 @@
       state.firebaseUnsubscribe = null;
     }
 
-    console.log('Setting up Firebase real-time listener for pending orders...');
-
     try {
       // Listen to orders where status == 'pending'
       state.firebaseUnsubscribe = db.collection('orders')
         .where('status', '==', 'pending')
         .onSnapshot(
           (snapshot) => {
-            console.log('Firebase orders snapshot received:', snapshot.size, 'orders');
-            
             const firebaseOrders = [];
             snapshot.forEach((doc) => {
               const data = doc.data();
-              
-              // Log raw Firestore data for debugging
-              console.log('Firebase order raw data:', {
-                id: doc.id,
-                orderId: data.orderId,
-                createdAt: data.createdAt,
-                submittedAt: data.submittedAt,
-                createdAtType: typeof data.createdAt,
-                createdAtValue: data.createdAt
-              });
-              
               firebaseOrders.push(normalizeOrder({
                 id: doc.id,
                 docId: doc.id,
@@ -296,7 +306,6 @@
       db.enableNetwork().then(() => {
         state.firebaseConnected = true;
         updateRealtimeStatus(true);
-        console.log('Firebase network enabled');
       }).catch((error) => {
         console.error('Firebase network error:', error);
         state.firebaseConnected = false;
@@ -316,7 +325,6 @@
     if (state.firebaseUnsubscribe) {
       state.firebaseUnsubscribe();
       state.firebaseUnsubscribe = null;
-      console.log('Firebase real-time listener stopped');
     }
   }
 
@@ -390,6 +398,9 @@
                       normalizeDate(order.updated_at) ||
                       null;
     
+    // Calculate total - prioritize totalAmount as it's the primary field in Firebase
+    const total = parseFloat(order.totalAmount || order.total || order.amount || 0);
+    
     return {
       id: order.id || order.docId || '',
       orderId: order.orderId || `#ORD-${(order.id || '').substring(0, 6).toUpperCase()}`,
@@ -401,8 +412,8 @@
       },
       // Products array
       products: products,
-      // Handle different total field names (total, amount, totalAmount)
-      total: parseFloat(order.total || order.amount || order.totalAmount || 0),
+      // Total amount (calculated from products if missing)
+      total: total || 0,
       status: (order.status || 'pending').toLowerCase(),
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -460,21 +471,71 @@
 
   // Display Functions
   function updateStatsDisplay() {
+    // Calculate percentage changes for each stat (comparing last 30 days vs previous 30 days)
+    const totalComparison = calculateComparison('total', '30d');
+    const pendingComparison = calculateComparison('pending', '30d');
+    const completedComparison = calculateComparison('completed', '30d');
+    const revenueComparison = calculateComparison('revenue', '30d');
+    
+    // Total Orders card - display count and percentage change
+    const totalCard = document.querySelector('.stat-card[data-stat-type="total"]');
     if (elements.statsCards.total) {
-      elements.statsCards.total.textContent = state.stats.totalOrders.toLocaleString();
+      const totalOrders = state.stats.totalOrders || 0;
+      elements.statsCards.total.textContent = totalOrders.toLocaleString();
     }
+    if (totalCard) {
+      const changeElement = totalCard.querySelector('.stat-change');
+      if (changeElement) {
+        const percentage = totalComparison.percentage || 0;
+        changeElement.textContent = `${percentage >= 0 ? '+' : ''}${percentage}%`;
+        changeElement.className = `stat-change ${percentage >= 0 ? 'positive' : 'negative'}`;
+      }
+    }
+    
+    // Pending Orders card - display count and percentage change
+    const pendingCard = document.querySelector('.stat-card[data-stat-type="pending"]');
     if (elements.statsCards.pending) {
-      elements.statsCards.pending.textContent = state.stats.pendingOrders.toLocaleString();
+      elements.statsCards.pending.textContent = (state.stats.pendingOrders || 0).toLocaleString();
     }
+    if (pendingCard) {
+      const changeElement = pendingCard.querySelector('.stat-change');
+      if (changeElement) {
+        const percentage = pendingComparison.percentage || 0;
+        changeElement.textContent = `${percentage >= 0 ? '+' : ''}${percentage}%`;
+        changeElement.className = `stat-change ${percentage >= 0 ? 'positive' : 'negative'}`;
+      }
+    }
+    
+    // Completed Orders card - display count and percentage change
+    const completedCard = document.querySelector('.stat-card[data-stat-type="completed"]');
     if (elements.statsCards.completed) {
-      elements.statsCards.completed.textContent = state.stats.completedOrders.toLocaleString();
+      elements.statsCards.completed.textContent = (state.stats.completedOrders || 0).toLocaleString();
     }
+    if (completedCard) {
+      const changeElement = completedCard.querySelector('.stat-change');
+      if (changeElement) {
+        const percentage = completedComparison.percentage || 0;
+        changeElement.textContent = `${percentage >= 0 ? '+' : ''}${percentage}%`;
+        changeElement.className = `stat-change ${percentage >= 0 ? 'positive' : 'negative'}`;
+      }
+    }
+    
+    // Revenue card - display currency and percentage change
+    const revenueCard = document.querySelector('.stat-card[data-stat-type="revenue"]');
     if (elements.statsCards.revenue) {
       const revenue = state.stats.revenue || 0;
       if (revenue >= 1000) {
-        elements.statsCards.revenue.textContent = `$${(revenue / 1000).toFixed(1)}k`;
+        elements.statsCards.revenue.textContent = `₦${(revenue / 1000).toFixed(1)}k`;
       } else {
         elements.statsCards.revenue.textContent = formatCurrency(revenue);
+      }
+    }
+    if (revenueCard) {
+      const changeElement = revenueCard.querySelector('.stat-change');
+      if (changeElement) {
+        const percentage = revenueComparison.percentage || 0;
+        changeElement.textContent = `${percentage >= 0 ? '+' : ''}${percentage}%`;
+        changeElement.className = `stat-change ${percentage >= 0 ? 'positive' : 'negative'}`;
       }
     }
   }
@@ -516,20 +577,6 @@
     state.filteredOrders = filteredOrders;
   }
 
-  /**
-   * Calculates total item count for an order
-   */
-  function calculateOrderItemCount(products) {
-    if (!products || !Array.isArray(products) || products.length === 0) {
-      return 0;
-    }
-    
-    return products.reduce((total, product) => {
-      const quantity = product.quantity || product.qty || 1;
-      return total + quantity;
-    }, 0);
-  }
-
   function renderOrders() {
     if (!elements.ordersTable) {
       console.warn('Orders table not found');
@@ -555,30 +602,6 @@
     elements.ordersTable.innerHTML = ordersToDisplay.map(order => {
       // Ensure order is normalized
       const normalizedOrder = normalizeOrder(order);
-      
-      // Debug logging (remove in production)
-      console.log('Rendering order:', normalizedOrder.orderId, {
-        products: normalizedOrder.products,
-        productsLength: normalizedOrder.products?.length,
-        total: normalizedOrder.total,
-        status: normalizedOrder.status,
-        createdAt: normalizedOrder.createdAt
-      });
-      
-      // Debug: Log raw product data structure
-      if (normalizedOrder.products && normalizedOrder.products.length > 0) {
-        console.log('First product structure:', normalizedOrder.products[0]);
-        console.log('All product keys:', normalizedOrder.products.map(p => Object.keys(p)));
-      }
-      
-      // Debug: Log date information
-      console.log('Order date info:', {
-        orderId: normalizedOrder.orderId,
-        createdAt: normalizedOrder.createdAt,
-        createdAtType: typeof normalizedOrder.createdAt,
-        isDate: normalizedOrder.createdAt instanceof Date,
-        formatted: formatDate(normalizedOrder.createdAt)
-      });
       
       const statusClass = getStatusClass(normalizedOrder.status);
       const statusText = (normalizedOrder.status || 'pending').charAt(0).toUpperCase() + (normalizedOrder.status || 'pending').slice(1);
@@ -764,21 +787,216 @@
   }
 
   // Global functions for onclick handlers
-  window.viewOrder = function(orderId) {
-    // Find order in normalized format
-    const order = state.orders.find(o => {
-      const normalized = normalizeOrder(o);
-      return normalized.id === orderId || o.id === orderId;
-    });
+  window.viewOrder = async function(orderId) {
+    // Show loading state
+    const productsContainer = document.getElementById('viewOrderProducts');
+    if (productsContainer) {
+      productsContainer.innerHTML = '<p style="text-align: center; padding: 2rem;"><i class="fas fa-spinner fa-spin"></i> Loading order details...</p>';
+    }
+
+    try {
+      // Fetch order from database
+      if (!window.api) {
+        showToast('API client not available', 'error');
+        return;
+      }
+
+      const response = await window.api.get(`/orders/${orderId}`);
+      
+      if (!response || !response.success || !response.data) {
+        showToast('Failed to fetch order details', 'error');
+        return;
+      }
+
+      const order = response.data;
+      console.log('Order fetched from API:', order);
+      console.log('Order products/cartItems:', order.products || order.items || order.cartItems);
+      
+      const normalizedOrder = normalizeOrder(order);
+      console.log('Normalized order:', normalizedOrder);
+      console.log('Normalized products:', normalizedOrder.products);
+      
+      // Fetch product details for each product in the order
+      if (normalizedOrder.products && normalizedOrder.products.length > 0) {
+        console.log(`Fetching details for ${normalizedOrder.products.length} products`);
+        await fetchProductDetails(normalizedOrder);
+        console.log('Products after fetching details:', normalizedOrder.products);
+      } else {
+        console.warn('No products found in normalized order. Original order:', order);
+        console.warn('Checking original order fields:', {
+          products: order.products,
+          items: order.items,
+          cartItems: order.cartItems
+        });
+      }
+      
+      showViewOrderModal(normalizedOrder);
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      showToast('Failed to load order details: ' + (error.message || 'Unknown error'), 'error');
+      
+      // Fallback to local order if available
+      const localOrder = state.orders.find(o => {
+        const normalized = normalizeOrder(o);
+        return normalized.id === orderId || o.id === orderId;
+      });
+      
+      if (localOrder) {
+        const normalizedOrder = normalizeOrder(localOrder);
+        showViewOrderModal(normalizedOrder);
+      }
+    }
+  };
+
+  /**
+   * Fetches product details from database for products in order
+   */
+  async function fetchProductDetails(normalizedOrder) {
+    const products = normalizedOrder.products || [];
     
-    if (!order) {
-      showToast('Order not found', 'error');
+    console.log('Fetching product details. Products:', products);
+    
+    if (products.length === 0) {
       return;
     }
 
-    const normalizedOrder = normalizeOrder(order);
-    showViewOrderModal(normalizedOrder);
-  };
+    // Fetch product details for each product
+    const productPromises = products.map(async (product, index) => {
+      // Log product structure for debugging
+      console.log(`Processing product ${index}:`, product);
+      
+      let productId = null;
+      let needsFetching = false;
+      
+        // Extract product ID - check multiple possible structures
+        if (typeof product === 'string') {
+          productId = product;
+          needsFetching = true;
+        } else if (typeof product === 'object' && product !== null) {
+          // Check for product ID in various fields (including nested product)
+          productId = product.productId || 
+                     product.product_id || 
+                     product.id || 
+                     product.product?.id || 
+                     product.product?.productId ||
+                     product.product?.product_id;
+        
+        // Check if product has name/details (cartItems might have nested product)
+        const hasProductName = product.name || product.productName || product.title || product.productTitle;
+        const hasProductData = product.image || product.imageUrl || product.description || product.category;
+        const nestedProduct = product.product;
+        
+        // If product is nested (cartItems might have product: {...}), extract it
+        if (nestedProduct && typeof nestedProduct === 'object') {
+          console.log('Found nested product:', nestedProduct);
+          // Merge nested product data with cart item data
+          const mergedProduct = {
+            ...nestedProduct,
+            ...product, // Preserve cartItem fields (quantity, price, etc.)
+            // Override with nested product details if available
+            name: nestedProduct.name || nestedProduct.productName || nestedProduct.title || product.name || product.productName || product.title,
+            productName: nestedProduct.productName || nestedProduct.name || product.productName || product.name,
+            title: nestedProduct.title || nestedProduct.name || product.title || product.name,
+            quantity: product.quantity || product.qty || nestedProduct.quantity || 1,
+            price: product.price || product.itemPrice || nestedProduct.price || 0,
+            orderPrice: product.price || product.itemPrice || nestedProduct.price || 0,
+          };
+          
+          // If nested product has details, use it
+          if (mergedProduct.name || mergedProduct.productName || mergedProduct.title) {
+            console.log('Using merged product with nested data:', mergedProduct);
+            return mergedProduct;
+          }
+        }
+        
+        // Need to fetch if we have an ID but no name/details
+        needsFetching = productId && !hasProductName && !hasProductData;
+        
+        // If cartItems have productId but no product details, fetch them
+        if (product.productId && !hasProductName) {
+          needsFetching = true;
+        }
+      }
+      
+      // Fetch product details if needed
+      if (needsFetching && productId) {
+        try {
+          if (!window.api) {
+            console.warn('API not available, returning product as-is');
+            return product;
+          }
+          
+          console.log(`Fetching product details for ID: ${productId}`);
+          const response = await window.api.get(`/products/${productId}`);
+          
+          if (response && response.success && response.data) {
+            console.log(`Fetched product ${productId}:`, response.data);
+            // Merge fetched product data with order product data (quantity, price, etc.)
+            const mergedProduct = {
+              ...response.data,
+              quantity: product.quantity || product.qty || 1,
+              price: product.price || product.itemPrice || response.data.price || 0,
+              // Preserve order-specific data
+              orderPrice: product.price || product.itemPrice || response.data.price || 0,
+            };
+            console.log('Merged product:', mergedProduct);
+            return mergedProduct;
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch product ${productId}:`, error);
+          // Return product as-is if fetch fails
+          return product;
+        }
+      }
+      
+      // Product already has details or no ID to fetch
+      // Ensure we preserve all existing fields and extract name properly
+      const nestedProduct = product.product || null;
+      
+      // Build final product with all possible fields
+      const finalProduct = {
+        ...product,
+        // Merge nested product data if it exists
+        ...(nestedProduct || {}),
+        // Override with top-level fields to preserve cartItem-specific data
+        quantity: product.quantity || product.qty || nestedProduct?.quantity || 1,
+        orderPrice: product.price || product.itemPrice || product.orderPrice || nestedProduct?.price || 0,
+        price: product.price || product.itemPrice || product.orderPrice || nestedProduct?.price || 0,
+        // Make sure name field exists from all possible sources (prioritize nested product name)
+        name: nestedProduct?.name ||
+              nestedProduct?.productName ||
+              nestedProduct?.title ||
+              product.name || 
+              product.productName || 
+              product.title || 
+              product.productTitle ||
+              'Unknown Product',
+        // Ensure image is available
+        imageUrl: nestedProduct?.imageUrl ||
+                  nestedProduct?.image ||
+                  nestedProduct?.imageURL ||
+                  nestedProduct?.photo ||
+                  nestedProduct?.thumbnail ||
+                  product.imageUrl || 
+                  product.image || 
+                  product.imageURL || 
+                  product.photo || 
+                  product.thumbnail ||
+                  product.productImage ||
+                  null,
+        // Preserve category
+        category: nestedProduct?.category || product.category || null,
+      };
+      
+      console.log(`Final product ${index}:`, finalProduct);
+      console.log(`Product name: "${finalProduct.name}"`);
+      return finalProduct;
+    });
+    
+    // Wait for all product fetches to complete
+    normalizedOrder.products = await Promise.all(productPromises);
+    console.log('Final products after fetching:', normalizedOrder.products);
+  }
 
   /**
    * Shows view order modal with complete order details
@@ -836,16 +1054,60 @@
       addressElement.innerHTML = '<p>N/A</p>';
     }
 
-    // Populate products
+    // Populate products (after fetching from database)
     const productsContainer = document.getElementById('viewOrderProducts');
     const products = normalizedOrder.products || [];
     
+    console.log('Products to display in modal:', products);
+    console.log('Products array length:', products.length);
+    
     if (products.length > 0) {
+      console.log('Rendering products:', products);
       productsContainer.innerHTML = products.map(product => {
-        const productName = product.name || product.productName || product.title || 'Unknown Product';
-        const imageUrl = product.imageUrl || product.image || product.imageURL || product.photo || product.thumbnail || 'https://via.placeholder.com/60x60';
+        // Get product details from fetched data
+        // Handle cartItems structure where product data might be nested
+        const productObj = product.product || product;
+        const productName = escapeHtml(
+          product.name || 
+          product.productName || 
+          product.title || 
+          product.productTitle ||
+          productObj?.name ||
+          productObj?.productName ||
+          productObj?.title ||
+          productObj?.productTitle ||
+          'Unknown Product'
+        );
+        
+        // Get image URL (prioritize fetched product image)
+        // Handle nested product structure
+        const imageUrl = escapeHtml(
+          product.imageUrl || 
+          product.image || 
+          product.imageURL || 
+          product.photo || 
+          product.thumbnail ||
+          product.productImage ||
+          productObj?.imageUrl ||
+          productObj?.image ||
+          productObj?.imageURL ||
+          productObj?.photo ||
+          productObj?.thumbnail ||
+          'https://via.placeholder.com/60x60'
+        );
+        
+        // Get quantity from order product data
         const quantity = product.quantity || product.qty || 1;
-        const price = parseFloat(product.price || product.itemPrice || 0);
+        
+        // Use order-specific price if available, otherwise use product price
+        const price = parseFloat(
+          product.orderPrice || 
+          product.price || 
+          product.itemPrice || 
+          product.productPrice ||
+          0
+        );
+        
         const totalPrice = price * quantity;
 
         return `
@@ -854,8 +1116,12 @@
             <div class="view-order-product-details">
               <div class="view-order-product-name">${productName}</div>
               <div class="view-order-product-quantity">Quantity: ${quantity}</div>
+              ${(product.category || productObj?.category) ? `<div class="view-order-product-category" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Category: ${escapeHtml(product.category || productObj?.category || '')}</div>` : ''}
             </div>
-            <div class="view-order-product-price">${formatCurrency(totalPrice)}</div>
+            <div class="view-order-product-price">
+              <div style="font-weight: 600; color: var(--text-primary);">${formatCurrency(totalPrice)}</div>
+              ${price > 0 ? `<div style="font-size: 0.75rem; color: var(--text-secondary);">${formatCurrency(price)} each</div>` : ''}
+            </div>
           </div>
         `;
       }).join('');
@@ -864,7 +1130,23 @@
     }
 
     // Populate order summary
-    const subtotal = normalizedOrder.total || 0;
+    // Calculate subtotal from products if available, otherwise use order total
+    let subtotal = normalizedOrder.total || normalizedOrder.totalAmount || 0;
+    
+    // If we have products with prices, calculate subtotal from products
+    if (products.length > 0) {
+      const calculatedSubtotal = products.reduce((sum, product) => {
+        const quantity = product.quantity || product.qty || 1;
+        const price = parseFloat(product.orderPrice || product.price || product.itemPrice || product.productPrice || 0);
+        return sum + (price * quantity);
+      }, 0);
+      
+      // Use calculated subtotal if it's greater than 0, otherwise use order total
+      if (calculatedSubtotal > 0) {
+        subtotal = calculatedSubtotal;
+      }
+    }
+    
     document.getElementById('viewOrderSubtotal').textContent = formatCurrency(subtotal);
     document.getElementById('viewOrderTotal').textContent = formatCurrency(subtotal);
 
@@ -1105,7 +1387,6 @@
                 paidAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
               });
-              console.log(`Order ${orderId} marked as paid via Firebase`);
               showToast(`Order ${orderId} marked as paid!`, 'success');
               
               // Refresh orders if using API
@@ -1171,7 +1452,6 @@
                 rejectedReason: reason || '',
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
               });
-              console.log(`Order ${orderId} rejected via Firebase`);
               showToast(`Order ${orderId} rejected!`, 'success');
               
               // Refresh orders if using API
@@ -1264,7 +1544,6 @@
       e.preventDefault();
       e.stopPropagation();
       sidebar.classList.toggle('mobile-open');
-      console.log('Mobile menu toggled, sidebar has mobile-open:', sidebar.classList.contains('mobile-open'));
     });
 
     // Close sidebar when clicking outside on mobile
@@ -1281,8 +1560,6 @@
 
   // Initialize
   async function init() {
-    console.log('Initializing admin order management...');
-    
     if (!checkAuth()) {
       return;
     }
@@ -1345,11 +1622,9 @@
       // 2. We detect this might be a pending orders page (can be customized)
       if (realtimeParam === 'true' || window.location.pathname.includes('firebase')) {
         state.useFirebaseRealtime = true;
-        console.log('Enabling Firebase real-time listener');
         setupFirebaseRealtimeListener();
       } else {
         // Use Firebase as a supplement (merge with API data)
-        console.log('Using Firebase as supplement to API data');
         setupFirebaseRealtimeListener();
       }
     } else {
@@ -1363,7 +1638,6 @@
         fetchOrderStats(),
         fetchOrders(),
       ]);
-      console.log('Orders and stats loaded successfully');
     } catch (error) {
       console.error('Error during initialization:', error);
       showToast('Error loading data. Please refresh the page.', 'error');
@@ -1387,88 +1661,209 @@
     mainChart: null,
     breakdownChart: null,
   };
+  
+  // Current dashboard state
+  let currentDashboardStatType = null;
+  let currentTimePeriod = '30d'; // Default to 30 days
 
   /**
-   * Calculate 30-day performance comparison
+   * Get time period boundaries based on period string
    */
-  function calculate30DayComparison(statType, currentValue) {
+  function getTimePeriodBounds(period) {
     const now = new Date();
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const sixtyDaysAgo = new Date(now);
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+    let startDate, previousStartDate;
+    
+    switch (period) {
+      case '24h':
+        startDate = new Date(now);
+        startDate.setHours(now.getHours() - 24);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setHours(previousStartDate.getHours() - 24);
+        return { startDate, previousStartDate, periodLabel: 'last 24 hours' };
+        
+      case '3d':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 3);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setDate(previousStartDate.getDate() - 3);
+        return { startDate, previousStartDate, periodLabel: 'last 3 days' };
+        
+      case '1w':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setDate(previousStartDate.getDate() - 7);
+        return { startDate, previousStartDate, periodLabel: 'last week' };
+        
+      case '30d':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 30);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setDate(previousStartDate.getDate() - 30);
+        return { startDate, previousStartDate, periodLabel: 'last 30 days' };
+        
+      case '1y':
+        startDate = new Date(now);
+        startDate.setFullYear(now.getFullYear() - 1);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setFullYear(previousStartDate.getFullYear() - 1);
+        return { startDate, previousStartDate, periodLabel: 'last year' };
+        
+      case 'all':
+        // For all time, compare against itself (0% change)
+        return { startDate: new Date(0), previousStartDate: new Date(0), periodLabel: 'all time' };
+        
+      default:
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 30);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setDate(previousStartDate.getDate() - 30);
+        return { startDate, previousStartDate, periodLabel: 'last 30 days' };
+    }
+  }
+  
+  /**
+   * Calculate performance comparison for any time period
+   */
+  function calculateComparison(statType, timePeriod) {
+    const { startDate, previousStartDate } = getTimePeriodBounds(timePeriod);
+    const now = new Date();
 
     const orders = state.orders || [];
     
-    let previous30DaysValue = 0;
-    let current30DaysValue = 0;
+    let previousPeriodValue = 0;
+    let currentPeriodValue = 0;
+
+    // For "all time", no comparison is possible
+    if (timePeriod === 'all') {
+      return { percentage: 0, periodLabel: 'all time' };
+    }
 
     orders.forEach(order => {
       const orderDate = normalizeDate(order.createdAt);
       if (!orderDate) return;
 
-      const orderTotal = parseFloat(order.total || order.amount || 0);
+      const orderTotal = parseFloat(order.total || order.totalAmount || order.amount || 0);
       const status = (order.status || '').toLowerCase();
 
-      if (orderDate >= thirtyDaysAgo && orderDate <= now) {
-        // Current 30 days
+      // Check if order is in current period
+      if (orderDate >= startDate && orderDate <= now) {
         if (statType === 'total') {
-          current30DaysValue++;
+          currentPeriodValue++;
         } else if (statType === 'pending' && status === 'pending') {
-          current30DaysValue++;
+          currentPeriodValue++;
         } else if (statType === 'completed' && (status === 'completed' || status === 'delivered')) {
-          current30DaysValue++;
-        } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered')) {
-          current30DaysValue += orderTotal;
+          currentPeriodValue++;
+        } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered' || status === 'paid')) {
+          currentPeriodValue += orderTotal;
         }
-      } else if (orderDate >= sixtyDaysAgo && orderDate < thirtyDaysAgo) {
-        // Previous 30 days
+      }
+      // Check if order is in previous period (for comparison)
+      else if (orderDate >= previousStartDate && orderDate < startDate) {
         if (statType === 'total') {
-          previous30DaysValue++;
+          previousPeriodValue++;
         } else if (statType === 'pending' && status === 'pending') {
-          previous30DaysValue++;
+          previousPeriodValue++;
         } else if (statType === 'completed' && (status === 'completed' || status === 'delivered')) {
-          previous30DaysValue++;
-        } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered')) {
-          previous30DaysValue += orderTotal;
+          previousPeriodValue++;
+        } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered' || status === 'paid')) {
+          previousPeriodValue += orderTotal;
         }
       }
     });
 
     // Calculate percentage change
-    if (previous30DaysValue === 0) {
-      return current30DaysValue > 0 ? 100 : 0;
+    let percentage = 0;
+    if (previousPeriodValue === 0) {
+      percentage = currentPeriodValue > 0 ? 100 : 0;
+    } else {
+      percentage = ((currentPeriodValue - previousPeriodValue) / previousPeriodValue) * 100;
     }
     
-    const percentageChange = ((current30DaysValue - previous30DaysValue) / previous30DaysValue) * 100;
-    return Math.round(percentageChange * 10) / 10;
+    const { periodLabel } = getTimePeriodBounds(timePeriod);
+    return {
+      percentage: Math.round(percentage * 10) / 10,
+      periodLabel: periodLabel
+    };
   }
 
   /**
-   * Generate time series data for charts
+   * Generate time series data for charts based on time period
    */
-  function generateTimeSeriesData(statType, days = 30) {
+  function generateTimeSeriesData(statType, timePeriod) {
     const now = new Date();
     const labels = [];
     const data = [];
+    
+    let intervalCount, intervalDuration, labelFormat;
+    
+    // Determine interval based on time period
+    switch (timePeriod) {
+      case '24h':
+        intervalCount = 24; // Hourly intervals
+        intervalDuration = 60 * 60 * 1000; // 1 hour in milliseconds
+        labelFormat = (date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        break;
+      case '3d':
+        intervalCount = 18; // 4-hour intervals (72 hours / 4 = 18)
+        intervalDuration = 4 * 60 * 60 * 1000; // 4 hours
+        labelFormat = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' });
+        break;
+      case '1w':
+        intervalCount = 7; // Daily intervals
+        intervalDuration = 24 * 60 * 60 * 1000; // 1 day
+        labelFormat = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        break;
+      case '30d':
+        intervalCount = 30; // Daily intervals
+        intervalDuration = 24 * 60 * 60 * 1000; // 1 day
+        labelFormat = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        break;
+      case '1y':
+        intervalCount = 12; // Monthly intervals
+        intervalDuration = null; // Will be calculated per month
+        labelFormat = (date) => date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        break;
+      case 'all':
+        // For all time, show monthly intervals for last 12 months or total if less
+        intervalCount = 12;
+        intervalDuration = null;
+        labelFormat = (date) => date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        break;
+      default:
+        intervalCount = 30;
+        intervalDuration = 24 * 60 * 60 * 1000;
+        labelFormat = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
 
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      labels.push(dateStr);
+    for (let i = intervalCount - 1; i >= 0; i--) {
+      let intervalStart, intervalEnd;
+      
+      if (timePeriod === '1y' || timePeriod === 'all') {
+        // Monthly intervals
+        intervalStart = new Date(now);
+        intervalStart.setMonth(now.getMonth() - i);
+        intervalStart.setDate(1);
+        intervalStart.setHours(0, 0, 0, 0);
+        
+        intervalEnd = new Date(intervalStart);
+        intervalEnd.setMonth(intervalEnd.getMonth() + 1);
+        intervalEnd.setMilliseconds(-1);
+      } else {
+        // Fixed duration intervals
+        intervalEnd = new Date(now.getTime() - (i * intervalDuration));
+        intervalStart = new Date(intervalEnd.getTime() - intervalDuration);
+      }
+      
+      labels.push(labelFormat(intervalStart));
 
       let count = 0;
-      const dayStart = new Date(date);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(date);
-      dayEnd.setHours(23, 59, 59, 999);
 
       (state.orders || []).forEach(order => {
         const orderDate = normalizeDate(order.createdAt);
         if (!orderDate) return;
 
-        if (orderDate >= dayStart && orderDate <= dayEnd) {
+        if (orderDate >= intervalStart && orderDate <= intervalEnd) {
           const orderTotal = parseFloat(order.total || order.amount || 0);
           const status = (order.status || '').toLowerCase();
 
@@ -1478,7 +1873,7 @@
             count++;
           } else if (statType === 'completed' && (status === 'completed' || status === 'delivered')) {
             count++;
-          } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered')) {
+          } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered' || status === 'paid')) {
             count += orderTotal;
           }
         }
@@ -1493,31 +1888,135 @@
   /**
    * Show analytics dashboard modal
    */
-  window.showAnalyticsDashboard = function(statType) {
+  window.showAnalyticsDashboard = async function(statType) {
+    console.log('showAnalyticsDashboard called:', statType);
+    
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+      console.error('Chart.js is not loaded!');
+      showToast('Chart.js library not loaded. Please refresh the page.', 'error');
+      return;
+    }
+    
     const modal = document.getElementById('analyticsDashboardModal');
-    if (!modal) return;
+    if (!modal) {
+      console.error('Analytics modal not found');
+      return;
+    }
 
     // Destroy existing charts
     destroyCharts();
+    
+    // Store current stat type
+    currentDashboardStatType = statType;
+    
+    // Reset time period to default
+    const timePeriodSelect = document.getElementById('dashboardTimePeriod');
+    if (timePeriodSelect) {
+      currentTimePeriod = timePeriodSelect.value || '30d';
+    }
 
-    // Show modal
+    // Show modal with loading state
     modal.classList.remove('hidden');
+    
+    // Show loading indicator
+    const dashboardBody = document.querySelector('.dashboard-body');
+    if (dashboardBody) {
+      const existingLoader = dashboardBody.querySelector('.dashboard-loader');
+      if (existingLoader) existingLoader.remove();
+      
+      const loader = document.createElement('div');
+      loader.className = 'dashboard-loader';
+      loader.style.cssText = 'display: flex; align-items: center; justify-content: center; padding: 3rem; text-align: center;';
+      loader.innerHTML = '<div><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color); margin-bottom: 1rem;"></i><p>Loading analytics data...</p></div>';
+      dashboardBody.insertBefore(loader, dashboardBody.firstChild);
+    }
 
-    // Render dashboard based on stat type
-    renderDashboard(statType);
+    try {
+      // Always fetch fresh orders data for analytics (with all orders, no filters)
+      await fetchOrders(true); // true = for analytics
+      
+      // Also refresh stats
+      await fetchOrderStats();
+      
+      // Wait a bit to ensure data is processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Remove loading indicator
+      const loader = dashboardBody?.querySelector('.dashboard-loader');
+      if (loader) loader.remove();
+
+      // Log data for debugging
+      console.log('Analytics Data Loaded:', {
+        statType,
+        ordersCount: state.orders?.length || 0,
+        stats: state.stats,
+        timePeriod: currentTimePeriod
+      });
+      
+      // Render dashboard based on stat type
+      renderDashboard(statType, currentTimePeriod);
+      
+      // Set up time period filter change handler
+      setupDashboardTimePeriodFilter();
+    } catch (error) {
+      console.error('Error loading analytics data:', error);
+      
+      // Remove loading indicator
+      const loader = dashboardBody?.querySelector('.dashboard-loader');
+      if (loader) loader.remove();
+      
+      // Show error message
+      showToast('Failed to load analytics data. Please try again.', 'error');
+      
+      // Still render dashboard with available data
+      renderDashboard(statType, currentTimePeriod);
+      setupDashboardTimePeriodFilter();
+    }
   };
 
   /**
+   * Set up time period filter change handler
+   */
+  function setupDashboardTimePeriodFilter() {
+    const timePeriodSelect = document.getElementById('dashboardTimePeriod');
+    if (!timePeriodSelect) return;
+    
+    // Remove existing listener by cloning
+    const newSelect = timePeriodSelect.cloneNode(true);
+    timePeriodSelect.parentNode.replaceChild(newSelect, timePeriodSelect);
+    
+    newSelect.addEventListener('change', async (e) => {
+      currentTimePeriod = e.target.value;
+      if (currentDashboardStatType) {
+        // Ensure we have fresh data before rendering
+        try {
+          if (!state.orders || state.orders.length === 0) {
+            await fetchOrders();
+          }
+          renderDashboard(currentDashboardStatType, currentTimePeriod);
+        } catch (error) {
+          console.error('Error refreshing analytics:', error);
+          renderDashboard(currentDashboardStatType, currentTimePeriod);
+        }
+      }
+    });
+  }
+  
+  /**
    * Render dashboard content
    */
-  function renderDashboard(statType) {
+  function renderDashboard(statType, timePeriod = '30d') {
+    console.log('Rendering dashboard:', { statType, timePeriod, ordersCount: state.orders?.length || 0 });
+    
     const statConfig = {
       total: {
         title: 'Total Orders Analytics',
         label: 'Total Orders',
-        value: state.stats.totalOrders,
+        value: state.stats.totalOrders || 0,
         icon: 'fa-shopping-bag',
         color: 'var(--primary-color)',
+        isCurrency: false,
       },
       pending: {
         title: 'Pending Orders Analytics',
@@ -1545,8 +2044,35 @@
 
     const config = statConfig[statType] || statConfig.total;
     
-    // Calculate 30-day performance
-    const percentageChange = calculate30DayComparison(statType, config.value);
+    // Calculate actual value for the selected time period
+    const { startDate } = getTimePeriodBounds(timePeriod);
+    const now = new Date();
+    let periodValue = 0;
+    
+    (state.orders || []).forEach(order => {
+      const orderDate = normalizeDate(order.createdAt);
+      if (!orderDate) return;
+      
+      // Check if order is within the selected time period (or all time)
+      if (timePeriod === 'all' || (orderDate >= startDate && orderDate <= now)) {
+        const orderTotal = parseFloat(order.total || order.totalAmount || order.amount || 0);
+        const status = (order.status || '').toLowerCase();
+        
+        if (statType === 'total') {
+          periodValue++;
+        } else if (statType === 'pending' && status === 'pending') {
+          periodValue++;
+        } else if (statType === 'completed' && (status === 'completed' || status === 'delivered')) {
+          periodValue++;
+        } else if (statType === 'revenue' && (status === 'completed' || status === 'delivered' || status === 'paid')) {
+          periodValue += orderTotal;
+        }
+      }
+    });
+    
+    // Calculate performance comparison for selected time period
+    const comparison = calculateComparison(statType, timePeriod);
+    const percentageChange = comparison.percentage || 0;
     const isPositive = percentageChange >= 0;
 
     // Update main stat display
@@ -1560,44 +2086,67 @@
     
     if (mainValue) {
       if (config.isCurrency) {
-        mainValue.textContent = formatCurrency(config.value);
+        mainValue.textContent = formatCurrency(periodValue);
       } else {
-        mainValue.textContent = config.value.toLocaleString();
+        mainValue.textContent = periodValue.toLocaleString();
       }
     }
 
     if (mainChange) {
       const indicator = mainChange.querySelector('.change-indicator');
-      const label = mainChange.querySelector('.change-label');
+      const label = mainChange.querySelector('.change-label') || document.getElementById('dashboardChangeLabel');
       
       if (indicator) {
-        indicator.textContent = `${isPositive ? '+' : ''}${percentageChange}%`;
+        if (timePeriod === 'all') {
+          indicator.textContent = 'N/A';
+        } else {
+          indicator.textContent = `${isPositive ? '+' : ''}${percentageChange}%`;
+        }
         indicator.className = `change-indicator ${isPositive ? 'positive' : 'negative'}`;
       }
-      if (label) label.textContent = 'vs last 30 days';
+      if (label) {
+        if (timePeriod === 'all') {
+          label.textContent = 'All time (no comparison)';
+        } else {
+          label.textContent = `vs previous ${comparison.periodLabel}`;
+        }
+      }
     }
 
-    // Render charts
-    renderMainChart(statType, config);
-    renderBreakdownChart(statType, config);
-    renderActivityList(statType);
+    // Render charts with selected time period
+    renderMainChart(statType, config, timePeriod);
+    renderBreakdownChart(statType, config, timePeriod);
+    renderActivityList(statType, timePeriod);
   }
 
   /**
    * Render main time series chart
    */
-  function renderMainChart(statType, config) {
+  function renderMainChart(statType, config, timePeriod = '30d') {
     const canvas = document.getElementById('dashboardMainChart');
-    if (!canvas) return;
+    if (!canvas) {
+      console.error('Main chart canvas not found');
+      return;
+    }
 
+    console.log('Rendering main chart:', { statType, timePeriod });
+    
     const ctx = canvas.getContext('2d');
-    const { labels, data } = generateTimeSeriesData(statType, 30);
+    const { labels, data } = generateTimeSeriesData(statType, timePeriod);
+    
+    console.log('Main chart data:', { labelsCount: labels.length, dataPoints: data.length, data });
+    
+    if (!labels || labels.length === 0 || !data || data.length === 0) {
+      console.warn('No data for main chart');
+      return;
+    }
 
     if (dashboardCharts.mainChart) {
       dashboardCharts.mainChart.destroy();
     }
 
-    dashboardCharts.mainChart = new Chart(ctx, {
+    try {
+      dashboardCharts.mainChart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: labels,
@@ -1649,7 +2198,7 @@
             ticks: {
               callback: function(value) {
                 if (config.isCurrency) {
-                  return '$' + (value / 1000).toFixed(1) + 'k';
+                  return '₦' + (value / 1000).toFixed(1) + 'k';
                 }
                 return value;
               },
@@ -1667,31 +2216,76 @@
         },
       },
     });
+    
+    console.log('Main chart rendered successfully');
+    } catch (error) {
+      console.error('Error rendering main chart:', error);
+      const container = canvas.parentElement;
+      if (container) {
+        container.innerHTML = `<p style="color: var(--danger-color); text-align: center; padding: 2rem;">Error rendering chart: ${error.message}</p>`;
+      }
+    }
   }
 
   /**
    * Render breakdown chart (doughnut/pie)
    */
-  function renderBreakdownChart(statType, config) {
+  function renderBreakdownChart(statType, config, timePeriod = '30d') {
     const canvas = document.getElementById('dashboardBreakdownChart');
-    if (!canvas) return;
+    if (!canvas) {
+      console.error('Breakdown chart canvas not found');
+      return;
+    }
 
+    console.log('Rendering breakdown chart:', { statType, timePeriod });
+    
     const ctx = canvas.getContext('2d');
+    
+    // Set explicit canvas dimensions
+    const container = canvas.parentElement;
+    if (container) {
+      const containerWidth = container.clientWidth || container.offsetWidth || 400;
+      const containerHeight = container.clientHeight || container.offsetHeight || 300;
+      // Don't set canvas.width/height directly - let Chart.js handle it
+      // But ensure container has proper dimensions
+      if (containerWidth > 0 && containerHeight > 0) {
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.display = 'block';
+      }
+    }
+    
+    // Get time period bounds for filtering
+    const { startDate } = getTimePeriodBounds(timePeriod);
+    const now = new Date();
+    
+    // Filter orders by time period
+    const filteredOrders = (state.orders || []).filter(order => {
+      const orderDate = normalizeDate(order.createdAt);
+      if (!orderDate) return false;
+      return timePeriod === 'all' || (orderDate >= startDate && orderDate <= now);
+    });
     
     // Get breakdown data based on stat type
     let breakdownData = {};
     
-    if (statType === 'total' || statType === 'completed') {
-      // Break down by status
-      (state.orders || []).forEach(order => {
+    if (statType === 'total') {
+      // Break down by status (order count per status)
+      filteredOrders.forEach(order => {
         const status = (order.status || '').toLowerCase();
-        if (statType === 'total' || (statType === 'completed' && (status === 'completed' || status === 'delivered'))) {
+        breakdownData[status] = (breakdownData[status] || 0) + 1;
+      });
+    } else if (statType === 'completed') {
+      // Break down by status
+      filteredOrders.forEach(order => {
+        const status = (order.status || '').toLowerCase();
+        if (status === 'completed' || status === 'delivered') {
           breakdownData[status] = (breakdownData[status] || 0) + 1;
         }
       });
     } else if (statType === 'pending') {
       // Break down by age (days pending)
-      (state.orders || []).forEach(order => {
+      filteredOrders.forEach(order => {
         const status = (order.status || '').toLowerCase();
         if (status === 'pending') {
           const orderDate = normalizeDate(order.createdAt);
@@ -1707,10 +2301,10 @@
       });
     } else if (statType === 'revenue') {
       // Break down by order status
-      (state.orders || []).forEach(order => {
+      filteredOrders.forEach(order => {
         const status = (order.status || '').toLowerCase();
-        if (status === 'completed' || status === 'delivered') {
-          const orderTotal = parseFloat(order.total || order.amount || 0);
+        if (status === 'completed' || status === 'delivered' || status === 'paid') {
+          const orderTotal = parseFloat(order.total || order.totalAmount || order.amount || 0);
           breakdownData[status] = (breakdownData[status] || 0) + orderTotal;
         }
       });
@@ -1718,6 +2312,21 @@
 
     const labels = Object.keys(breakdownData);
     const data = Object.values(breakdownData);
+    
+    // Show message if no data
+    if (labels.length === 0 || data.every(d => d === 0)) {
+      const container = document.getElementById('dashboardDetailContent1');
+      if (container) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No data available for this period</p>';
+      }
+      if (dashboardCharts.breakdownChart) {
+        dashboardCharts.breakdownChart.destroy();
+        dashboardCharts.breakdownChart = null;
+      }
+      return;
+    }
+    
+    console.log('Rendering breakdown chart with data:', { labels, data, statType, timePeriod });
     
     const colors = [
       'rgba(99, 102, 241, 0.8)',
@@ -1732,15 +2341,18 @@
       dashboardCharts.breakdownChart.destroy();
     }
 
-    dashboardCharts.breakdownChart = new Chart(ctx, {
-      type: 'doughnut',
+    try {
+      dashboardCharts.breakdownChart = new Chart(ctx, {
+      type: 'pie',
       data: {
         labels: labels,
         datasets: [{
           data: data,
           backgroundColor: colors.slice(0, labels.length),
-          borderWidth: 2,
+          borderWidth: 3,
           borderColor: '#fff',
+          hoverBorderWidth: 4,
+          hoverOffset: 8,
         }],
       },
       options: {
@@ -1751,63 +2363,112 @@
             position: 'bottom',
             labels: {
               padding: 15,
-              font: { size: 12 },
+              font: { 
+                size: 12,
+                weight: '500',
+              },
+              usePointStyle: true,
+              pointStyle: 'circle',
             },
           },
           tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
             padding: 12,
+            titleFont: { size: 13, weight: '600' },
+            bodyFont: { size: 12 },
+            cornerRadius: 8,
+            displayColors: true,
             callbacks: {
               label: function(context) {
                 const label = context.label || '';
-                const value = context.parsed;
+                const value = context.parsed || context.parsed === 0 ? context.parsed : context.raw;
                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                const percentage = ((value / total) * 100).toFixed(1);
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                 
                 if (config.isCurrency) {
                   return `${label}: ${formatCurrency(value)} (${percentage}%)`;
                 }
                 return `${label}: ${value.toLocaleString()} (${percentage}%)`;
               },
+              footer: function(tooltipItems) {
+                const total = tooltipItems.reduce((sum, item) => {
+                  return sum + (item.parsed || item.raw || 0);
+                }, 0);
+                
+                if (config.isCurrency) {
+                  return `Total: ${formatCurrency(total)}`;
+                }
+                return `Total: ${total.toLocaleString()}`;
+              },
             },
           },
         },
+        animation: {
+          animateRotate: true,
+          animateScale: true,
+          duration: 1000,
+        },
       },
     });
+    
+    console.log('Breakdown chart rendered successfully');
+    } catch (error) {
+      console.error('Error rendering breakdown chart:', error);
+      const container = document.getElementById('dashboardDetailContent1');
+      if (container) {
+        container.innerHTML = `<p style="color: var(--danger-color); text-align: center; padding: 2rem;">Error rendering chart: ${error.message}</p>`;
+      }
+    }
   }
 
   /**
    * Render activity list
    */
-  function renderActivityList(statType) {
+  function renderActivityList(statType, timePeriod = '30d') {
     const container = document.getElementById('dashboardDetailContent2');
     if (!container) return;
 
-    const orders = state.orders || [];
+    // Get time period bounds for filtering
+    const { startDate } = getTimePeriodBounds(timePeriod);
+    const now = new Date();
+    
+    // Filter orders by time period first
+    const filteredOrders = (state.orders || []).filter(order => {
+      const orderDate = normalizeDate(order.createdAt);
+      if (!orderDate) return false;
+      return timePeriod === 'all' || (orderDate >= startDate && orderDate <= now);
+    });
+    
     let relevantOrders = [];
 
     if (statType === 'total') {
-      relevantOrders = orders.slice(0, 10);
+      relevantOrders = filteredOrders
+        .sort((a, b) => {
+          const dateA = normalizeDate(a.createdAt);
+          const dateB = normalizeDate(b.createdAt);
+          return (dateB || new Date(0)) - (dateA || new Date(0));
+        })
+        .slice(0, 10);
     } else if (statType === 'pending') {
-      relevantOrders = orders
+      relevantOrders = filteredOrders
         .filter(o => (o.status || '').toLowerCase() === 'pending')
         .slice(0, 10);
     } else if (statType === 'completed') {
-      relevantOrders = orders
+      relevantOrders = filteredOrders
         .filter(o => {
           const status = (o.status || '').toLowerCase();
           return status === 'completed' || status === 'delivered';
         })
         .slice(0, 10);
     } else if (statType === 'revenue') {
-      relevantOrders = orders
+      relevantOrders = filteredOrders
         .filter(o => {
           const status = (o.status || '').toLowerCase();
-          return status === 'completed' || status === 'delivered';
+          return status === 'completed' || status === 'delivered' || status === 'paid';
         })
         .sort((a, b) => {
-          const totalA = parseFloat(a.total || a.amount || 0);
-          const totalB = parseFloat(b.total || b.amount || 0);
+          const totalA = parseFloat(a.total || a.totalAmount || a.amount || 0);
+          const totalB = parseFloat(b.total || b.totalAmount || b.amount || 0);
           return totalB - totalA;
         })
         .slice(0, 10);
@@ -1827,7 +2488,10 @@
       let icon = 'fa-shopping-bag';
       let iconColor = 'var(--primary-color)';
       
-      if (statType === 'pending') {
+      if (statType === 'total') {
+        icon = 'fa-dollar-sign';
+        iconColor = 'var(--primary-color)';
+      } else if (statType === 'pending') {
         icon = 'fa-clock';
         iconColor = 'var(--danger-color)';
       } else if (statType === 'completed') {

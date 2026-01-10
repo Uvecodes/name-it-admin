@@ -12,6 +12,80 @@ const {
 } = require('../utils/firestore-rest');
 
 /**
+ * Converts Firestore value types to JavaScript values
+ * Handles mapValue, stringValue, integerValue, etc.
+ */
+function convertFirestoreValue(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  
+  // Handle Firestore value types
+  if (typeof value === 'object' && value !== null) {
+    // String value
+    if (value.stringValue !== undefined) {
+      return value.stringValue;
+    }
+    // Integer value
+    if (value.integerValue !== undefined) {
+      return parseInt(value.integerValue, 10);
+    }
+    // Double value
+    if (value.doubleValue !== undefined) {
+      return parseFloat(value.doubleValue);
+    }
+    // Boolean value
+    if (value.booleanValue !== undefined) {
+      return value.booleanValue === 'true' || value.booleanValue === true;
+    }
+    // Array value
+    if (value.arrayValue !== undefined) {
+      const values = value.arrayValue.values || [];
+      return values.map(v => convertFirestoreValue(v));
+    }
+    // Map value (nested object) - this is what cartItems use
+    if (value.mapValue !== undefined) {
+      const fields = value.mapValue.fields || {};
+      const result = {};
+      for (const key in fields) {
+        result[key] = convertFirestoreValue(fields[key]);
+      }
+      return result;
+    }
+    // Timestamp value
+    if (value.timestampValue !== undefined) {
+      return new Date(value.timestampValue);
+    }
+    // Null value
+    if (value.nullValue !== undefined) {
+      return null;
+    }
+  }
+  
+  // If it's already a plain value, return as-is
+  return value;
+}
+
+/**
+ * Converts Firestore cartItems array to JavaScript array
+ * Handles the case where cartItems contain mapValue structures
+ */
+function convertCartItems(cartItems) {
+  if (!cartItems || !Array.isArray(cartItems)) {
+    return [];
+  }
+  
+  return cartItems.map(item => {
+    // If item is a mapValue structure, convert it
+    if (item && typeof item === 'object' && item.mapValue) {
+      return convertFirestoreValue(item);
+    }
+    // If item is already converted, return as-is
+    return item;
+  });
+}
+
+/**
  * GET /api/orders/stats
  * Get order statistics (total, pending, completed, revenue)
  */
@@ -27,6 +101,7 @@ router.get('/stats', verifyToken, asyncHandler(async (req, res) => {
     let pendingOrders = 0;
     let completedOrders = 0;
     let revenue = 0;
+    let totalCost = 0;
 
     try {
       let orders = [];
@@ -53,11 +128,14 @@ router.get('/stats', verifyToken, asyncHandler(async (req, res) => {
 
       orders.forEach(order => {
         const status = (order.status || '').toLowerCase();
-        const total = parseFloat(order.total || order.amount || 0);
+        const total = parseFloat(order.totalAmount || order.total || order.amount || 0);
+
+        // Sum total cost of all orders regardless of status
+        totalCost += total;
 
         if (status === 'pending') {
           pendingOrders++;
-        } else if (status === 'delivered' || status === 'completed') {
+        } else if (status === 'delivered' || status === 'completed' || status === 'paid') {
           completedOrders++;
           revenue += total;
         } else if (status === 'shipped' || status === 'processing') {
@@ -75,6 +153,7 @@ router.get('/stats', verifyToken, asyncHandler(async (req, res) => {
       pendingOrders,
       completedOrders,
       revenue: Math.round(revenue * 100) / 100, // Round to 2 decimal places
+      totalCost: Math.round(totalCost * 100) / 100, // Round to 2 decimal places
     }, 'Order statistics retrieved successfully');
   } catch (error) {
     console.error('Get order stats error:', error);
@@ -87,6 +166,7 @@ router.get('/stats', verifyToken, asyncHandler(async (req, res) => {
  * Get all orders (with optional filtering and pagination)
  */
 router.get('/', verifyToken, asyncHandler(async (req, res) => {
+  console.log('GET /orders endpoint called');
   try {
     // Get the ID token for REST API calls
     const authHeader = req.headers.authorization;
@@ -98,6 +178,7 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
 
     // Try Admin SDK first
     if (db && typeof db.collection === 'function') {
+      console.log('Using Admin SDK path for GET /orders');
       try {
         let query = db.collection('orders');
 
@@ -130,6 +211,8 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
         const snapshot = await query.get();
         orders = snapshot.docs.map(doc => {
           const data = doc.data();
+          console.log('Order data from Firebase:', doc.id, JSON.stringify(data, null, 2));
+          console.log('totalAmount value:', data.totalAmount, 'type:', typeof data.totalAmount);
           return {
             id: doc.id,
             orderId: data.orderId || `#ORD-${doc.id.substring(0, 6).toUpperCase()}`,
@@ -138,8 +221,9 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
               email: data.customerEmail || data.customer?.email || '',
               avatar: data.customerAvatar || data.customer?.avatar || null,
             },
-            products: data.products || data.items || [],
-            total: parseFloat(data.total || data.amount || 0),
+            products: data.products || data.items || data.cartItems || [],
+            // total: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
+            totalAmount: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0 || data.totalAmount),
             status: data.status || 'pending',
             createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
             updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
@@ -149,9 +233,12 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
         });
       } catch (adminError) {
         console.warn('Admin SDK failed, trying REST API:', adminError.message);
+        console.log('Using REST API fallback path for GET /orders');
         // Fallback to REST API
         const ordersData = await getFirestoreCollection('orders', idToken);
         orders = ordersData.map(data => {
+          console.log('Order data from REST API:', data.id, JSON.stringify(data, null, 2));
+          console.log('totalAmount value:', data.totalAmount, 'type:', typeof data.totalAmount);
           return {
             id: data.id,
             orderId: data.orderId || `#ORD-${data.id?.substring(0, 6).toUpperCase() || 'N/A'}`,
@@ -160,8 +247,9 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
               email: data.customerEmail || data.customer?.email || '',
               avatar: data.customerAvatar || data.customer?.avatar || null,
             },
-            products: data.products || data.items || [],
-            total: parseFloat(data.total || data.amount || 0),
+            products: data.products || data.items || data.cartItems || [],
+            // total: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
+            totalAmount: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
             status: data.status || 'pending',
             createdAt: data.createdAt || null,
             updatedAt: data.updatedAt || null,
@@ -198,6 +286,7 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
         }
       }
     } else {
+      console.log('Using REST API directly for GET /orders');
       // Use REST API directly
       const ordersData = await getFirestoreCollection('orders', idToken);
       orders = ordersData.map(data => {
@@ -209,8 +298,9 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
             email: data.customerEmail || data.customer?.email || '',
             avatar: data.customerAvatar || data.customer?.avatar || null,
           },
-          products: data.products || data.items || [],
-          total: parseFloat(data.total || data.amount || 0),
+          products: data.products || data.items || data.cartItems || [],
+          // total: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
+          totalAmount: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
           status: data.status || 'pending',
           createdAt: data.createdAt || null,
           updatedAt: data.updatedAt || null,
@@ -259,6 +349,7 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
  * Get single order by ID
  */
 router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
+  console.log('GET /orders/:id endpoint called for ID:', req.params.id);
   try {
     // Get the ID token for REST API calls
     const authHeader = req.headers.authorization;
@@ -270,6 +361,7 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
 
     // Try Admin SDK first
     if (db && typeof db.collection === 'function') {
+      console.log('Using Admin SDK path for GET /orders/:id');
       try {
         const orderDoc = await db.collection('orders').doc(req.params.id).get();
 
@@ -278,6 +370,8 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
         }
 
         const data = orderDoc.data();
+        console.log('Single order data from Firebase:', req.params.id, JSON.stringify(data, null, 2));
+        console.log('totalAmount value:', data.totalAmount, 'type:', typeof data.totalAmount);
         order = {
           id: orderDoc.id,
           orderId: data.orderId || `#ORD-${orderDoc.id.substring(0, 6).toUpperCase()}`,
@@ -286,8 +380,9 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
             email: data.customerEmail || data.customer?.email || '',
             avatar: data.customerAvatar || data.customer?.avatar || null,
           },
-          products: data.products || data.items || [],
-          total: parseFloat(data.total || data.amount || 0),
+          products: data.products || data.items || data.cartItems || [],
+          // total: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
+          totalAmount: data.totalAmount != null ? (typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(data.totalAmount)) : parseFloat(data.total || data.amount || 0),
           status: data.status || 'pending',
           createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
           updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
@@ -301,6 +396,16 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
         if (!orderData) {
           return sendError(res, 'Order not found', 404);
         }
+        console.log('Single order data from REST API (fallback):', req.params.id, JSON.stringify(orderData, null, 2));
+        console.log('totalAmount value:', orderData.totalAmount, 'type:', typeof orderData.totalAmount);
+        
+        // Convert cartItems from Firestore format if needed
+        let products = orderData.products || orderData.items || orderData.cartItems || [];
+        if (orderData.cartItems && Array.isArray(orderData.cartItems)) {
+          products = convertCartItems(orderData.cartItems);
+          console.log('Converted cartItems:', products);
+        }
+        
         order = {
           id: orderData.id,
           orderId: orderData.orderId || `#ORD-${orderData.id?.substring(0, 6).toUpperCase() || 'N/A'}`,
@@ -309,8 +414,9 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
             email: orderData.customerEmail || orderData.customer?.email || '',
             avatar: orderData.customerAvatar || orderData.customer?.avatar || null,
           },
-          products: orderData.products || orderData.items || [],
-          total: parseFloat(orderData.total || orderData.amount || 0),
+          products: products,
+          // total: orderData.totalAmount != null ? (typeof orderData.totalAmount === 'number' ? orderData.totalAmount : parseFloat(orderData.totalAmount)) : parseFloat(orderData.total || orderData.amount || 0),
+          totalAmount: orderData.totalAmount != null ? (typeof orderData.totalAmount === 'number' ? orderData.totalAmount : parseFloat(orderData.totalAmount)) : parseFloat(orderData.total || orderData.amount || 0),
           status: orderData.status || 'pending',
           createdAt: orderData.createdAt || null,
           updatedAt: orderData.updatedAt || null,
@@ -319,11 +425,22 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
         };
       }
     } else {
+      console.log('Using REST API directly for GET /orders/:id');
       // Use REST API directly
       const orderData = await getFirestoreDocument('orders', req.params.id, idToken);
       if (!orderData) {
         return sendError(res, 'Order not found', 404);
       }
+      console.log('Single order data from REST API (direct):', req.params.id, JSON.stringify(orderData, null, 2));
+      console.log('totalAmount value:', orderData.totalAmount, 'type:', typeof orderData.totalAmount);
+      
+      // Convert cartItems from Firestore format if needed
+      let products = orderData.products || orderData.items || orderData.cartItems || [];
+      if (orderData.cartItems && Array.isArray(orderData.cartItems)) {
+        products = convertCartItems(orderData.cartItems);
+        console.log('Converted cartItems:', products);
+      }
+      
       order = {
         id: orderData.id,
         orderId: orderData.orderId || `#ORD-${orderData.id?.substring(0, 6).toUpperCase() || 'N/A'}`,
@@ -332,8 +449,9 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
           email: orderData.customerEmail || orderData.customer?.email || '',
           avatar: orderData.customerAvatar || orderData.customer?.avatar || null,
         },
-        products: orderData.products || orderData.items || [],
-        total: parseFloat(orderData.total || orderData.amount || 0),
+        products: products,
+        // total: orderData.totalAmount != null ? (typeof orderData.totalAmount === 'number' ? orderData.totalAmount : parseFloat(orderData.totalAmount)) : parseFloat(orderData.total || orderData.amount || 0),
+        totalAmount: orderData.totalAmount != null ? (typeof orderData.totalAmount === 'number' ? orderData.totalAmount : parseFloat(orderData.totalAmount)) : parseFloat(orderData.total || orderData.amount || 0),
         status: orderData.status || 'pending',
         createdAt: orderData.createdAt || null,
         updatedAt: orderData.updatedAt || null,

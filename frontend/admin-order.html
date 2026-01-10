@@ -48,7 +48,7 @@
             <li><a href="./add-products.html" class="nav-link"><i class="fas fa-plus"></i>Add Product</a></li>
             <li><a href="./manage-products.html" class="nav-link"><i class="fas fa-box"></i>Manage Products</a></li>
             <li><a href="./admin-order.html" class="nav-link active"><i class="fas fa-shopping-cart"></i>Orders</a></li>
-            <li><a href="./admin-profile.html" class="nav-link active"><i class="fas fa-user"></i>Profile</a></li>
+            <li><a href="./admin-profile.html" class="nav-link"><i class="fas fa-user"></i>Profile</a></li>
             <li class="nav-divider"></li>
             <li><a href="index.html" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
         </ul>
@@ -104,7 +104,7 @@
                         <i class="fas fa-clock"></i>
                     </div>
                     <div class="stat-content">
-                        <h3>Pending</h3>
+                        <h3>Pending Orders</h3>
                         <p class="stat-number">0</p>
                         <span class="stat-change negative">0%</span>
                     </div>
@@ -115,7 +115,7 @@
                         <i class="fas fa-check-circle"></i>
                     </div>
                     <div class="stat-content">
-                        <h3>Completed</h3>
+                        <h3>Completed Orders</h3>
                         <p class="stat-number">0</p>
                         <span class="stat-change positive">0%</span>
                     </div>
@@ -123,11 +123,11 @@
                 
                 <div class="stat-card clickable-stat" data-stat-type="revenue" onclick="showAnalyticsDashboard('revenue')">
                     <div class="stat-icon">
-                        <i class="fas fa-dollar-sign"></i>
+                        <i class="fas fa-naira-sign"></i>
                     </div>
                     <div class="stat-content">
                         <h3>Revenue</h3>
-                        <p class="stat-number">$0</p>
+                        <p class="stat-number">₦0</p>
                         <span class="stat-change positive">0%</span>
                     </div>
                 </div>
@@ -156,7 +156,7 @@
                         <option value="clothes">Clothes</option>
                     </select>
                     
-                    <input type="date" class="filter-date" value="2024-01-01">
+                    <input type="date" class="filter-date">
                     
                     <button class="btn btn-primary">
                         <i class="fas fa-filter"></i>
@@ -392,13 +392,26 @@
                 </button>
             </div>
             <div class="modal-body dashboard-body">
+                <!-- Time Period Filter -->
+                <div class="dashboard-filter-container">
+                    <label for="dashboardTimePeriod" style="font-weight: 500; color: var(--text-primary); margin-right: 0.5rem;">Time Period:</label>
+                    <select id="dashboardTimePeriod" class="dashboard-filter-select">
+                        <option value="24h">Past 24 Hours</option>
+                        <option value="3d">Past 3 Days</option>
+                        <option value="1w">Past 1 Week</option>
+                        <option value="30d" selected>Past 30 Days</option>
+                        <option value="1y">Past 1 Year</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+                
                 <div class="dashboard-stats-row">
                     <div class="dashboard-stat-card">
                         <div class="dashboard-stat-label" id="dashboardMainLabel">Total</div>
                         <div class="dashboard-stat-value" id="dashboardMainValue">0</div>
                         <div class="dashboard-stat-change" id="dashboardMainChange">
                             <span class="change-indicator positive">0%</span>
-                            <span class="change-label">vs last 30 days</span>
+                            <span class="change-label" id="dashboardChangeLabel">vs last 30 days</span>
                         </div>
                     </div>
                     <div class="dashboard-chart-container">
